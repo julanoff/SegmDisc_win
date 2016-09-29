@@ -1,0 +1,30 @@
+The quote for customization of the Simulator for UMB transition from FT to MTS.
+
+Scope.
+Ability to compare messages between FT and MTS. It includes:
+.compare the outbound texts
+  . FED - no changes
+  . Swift - no changes
+  . custom feeds and outputs, like postings, etc.
+.compare list of corresponding fields
+.compare OFAC hits 
+
+
+Dependencies.
+. provide the layout for custom feeds and outputs for comparison
+. provide examples of the OFAC hits on FT
+  We need to see how legacy system marks hit entities (found SDN words)
+. list of necessary fields to be compared (the agreed upon list of fields on FT vs. MTS)
+. access to the data for testing 
+
+
+Estimates.
+. create a list of FT fields and identify the corresponding fields on MTS - 2 days
+. mapping of FTR/CREDIT/DEBIT/Destination sets from MTF1000, MIF, SWFMIDS, SWF_EXCH, SWF_EXCHO tables - 3 days
+. develop a mechanism to compare FT vs. MTS fields - 4.5 day
+. develop a mechanism to scan history(MTS) and audit trail (FT) for OFAC hits - 1.5 day
+. custom feed comparison - 2 days
+
+Total - 13 days.
+
+One EFT day is $1400
