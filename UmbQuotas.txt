@@ -1,5 +1,7 @@
 Benefits to the Bank
-Completes payments by getting ALL ACKs/NAKs without having FED/CHIPS/SWIFT/RTPS real connectivity
+
+Comprehensive regression testing to find discrepancies due to the faulty software releases 
+Completes payments by sening ALL ACKs/NAKs without having FED/CHIPS/SWIFT/RTPS real connectivity
 Easily reintroduce payments via GPP real communication lines 
 Increases efficiency by not wasting resources on processing unneeded messages and not spending time analyzing them
 Produces the difference report quickly and efficiently which identified potential problems
@@ -7,3 +9,9 @@ Smart message selection based on the provided software changes and previous test
 Decreases the number of transactions for the test by at least 40%
 Increases quality of testing with minimum efforts and resources
 All of the above translates to SIGNIFICANT QA SAVINGS for the Bank. 
+
+
+brief description
+1. regression
+2. simulation
+3. false hits reduction
