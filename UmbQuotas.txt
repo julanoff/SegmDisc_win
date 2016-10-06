@@ -14,4 +14,24 @@ All of the above translates to SIGNIFICANT QA SAVINGS for the Bank.
 brief description
 1. regression
 2. simulation
-3. false hits reduction
+3. OFAC false hits reduction
+4. Scoring 
+5. QA efficiency of OFAC operators
+
+simulation/regression
+the main objective is to scrutinize the software realese by comparing the results against the 'production' values.
+it must be done efficiently, robustly, and swiftly in order to execute the regression tests frequenly with minimum resources.
+The Simulator will replay 'real' production traffic thru the new software release, 
+provide all necessary ack/nak in order to complete all messages, 
+compare the outbound payments, confirmations, adices, and feeds to the other partner
+compare internal fields based on the config table and on the predefined rules of comparing.
+It will substentially reduce 'noise' (fields that are always difffrent like: times, dates, etc).
+We provide web based tools to analyse these results quickly and efficiently 
+
+false hits reduction/scoring
+
+
+the usage of the Simulator will 
+diminish the embarrasing and costly production problems
+enhance the comfort level of the funcionality before the release
+speed up the QA 
