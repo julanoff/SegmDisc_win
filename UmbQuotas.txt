@@ -1,452 +1,3178 @@
-http://www.askvg.com/fix-gmail-marks-your-important-emails-as-spam/
-
---------------------------------------------------
-TstValid.cs
-using System;
-using System.IO;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml.Schema;
-using System.Xml;
-using Simulator.ValidateXml;
-
-namespace TstValid
-{
-	/// <summary>
-	/// Summary description for mqputmsg.
-	/// </summary>
-	public class TstValid
-	{
-		/// <summary>
-		/// The main entry point for the application.
-		/// </summary>
-		[STAThread]
-		static void Main(string[] args)
-		{
-			TstValid mqputmsg = new TstValid();
-			mqputmsg.Run(args);
-		}
-
-		private int Run(string [] args)
-		{
-			if (args.Length < 1) 
-			{
-				Console.WriteLine (" File name is required.");	
-			}
-			else	
-			{	
-				ValidateXml util = new ValidateXml();
-				string XsdFolder = "C:\\RealTimePmnts\\";
-				string f_name=args[0];
-				StreamReader reader = new StreamReader(f_name);
-				string myXml = reader.ReadToEnd();
-				//Console.WriteLine (myXml);
-				if (util.IsXmlValid(myXml, XsdFolder))
-					Console.WriteLine ("good");
-				else
-					Console.WriteLine ("no good");
-			}
-			return (0);
-		}
-	}
-}
----------------------------------------------
-
-ValidateXml.cs
-using System;
-using System.IO;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml.Schema;
-using System.Xml;
-
-namespace Simulator.ValidateXml
-{
-	public class ValidateXml
-	{
-		static private bool stat;
-		
-		public bool IsXmlValid(string XmlText, string XsdFolder)
-		{
-			stat = true;
-			int pos = XmlText.IndexOf("xmlns=\"urn");
-			if (pos == -1) 
-			{
-				Console.WriteLine ("Schema is missing in the XML");
-				return false;
-			}
-			pos = pos + 7;
-			string XsdUrn = "";
-			while (XmlText[pos] != '\"' )
-			{
-				XsdUrn = XsdUrn + XmlText[pos];
-				pos ++;
-			}
-			Console.WriteLine ("Using XSD - " + XsdUrn);
-			string[] rfs = XsdUrn.Split(':');
-   //Load the XmlSchemaSet.
-      XmlSchemaSet schemaSet = new XmlSchemaSet();
-      string XsdFile = XsdFolder + rfs[rfs.Length-1] + ".xsd";
-      schemaSet.Add(XsdUrn, XsdFile);
-
-      Validate(XmlText, schemaSet);
-      return stat;
-		}
-    private static void Validate(String XmlText, XmlSchemaSet schemaSet)
-    {
-        Console.WriteLine();
-        Console.WriteLine("\r\nValidating XML file {0}...", XmlText.ToString());
-
-        XmlDocument doc = new XmlDocument();
-                // load the XSD schema.. is this right?
-        doc.Schemas.Add(schemaSet);
+%MODULE ISI2CBT_RCVBUF;
+
+************************************************************
+*							   *
+* Copyright (c) 1995-2009				   *
+* by ACIWorldwide, Inc., 1 Gateway Center, Newton MA 02158 *
+*							   *
+************************************************************
+
+* ISI2 link
+* API component.
+* RCVBUF routine.
+*
+* Modification history:
+*
+* D. Alquist	16-OCT-1995 15:40:45.30		PER #10977
+*     o	Store incoming sender's reference in ftr.incoming_ref field.
+*     o Remove dbt,cdt bank initialization (s/b done by mappers).
+*     o Index message by sender's reference number in SNDREFNDX.
+* D. Alquist	13-DEC-1995 11:54:10.51		SPR 12886
+*	FMT_APL event split into FMT_APL_REQ, FMT_APL_RSP.
+* A. Smith	22-Feb-2001	69863
+*	Don't make ref index entry if blank sender's ref.
+* A. Smith	13-Mar-2001	70637
+*	Create CBT version of ISI2 to support pure SWIFT
+*	message transmission, primarily targeted at the
+*	MQ transport option.
+* A. Smith	22-Jul-2001
+*	Call message routing to allow the message to be queued somewhere other
+*	than to an output queue via dispose. If the message routing call returns
+*	failure (and if the RMT parameter "MR ERROR CODE" is set to "EXIT"), then
+*	SCAN_DISPOSE will be called to dispatch the message. Inbound messages (in
+*	from SWIFT, output by this link) are queued in the top-level history, while
+*	outbound messages are queued in a sub-history.
+*
+* A. Smith	19-Oct-2001
+*	Port to AIX V1.1
+*	Propagate bug fix: truncation of MQ reply queue
+*
+* A. Smith	30-Jan-2002	#81264, 81265, 81288
+*	Add support for outbound telex messages, which must be embedded within
+*	pseudo-SWIFT syntax, with an optional "S" block following the end of the
+*	"4:" text block. The "S" block may contain additional details for
+*	delivery of the message, such as telex number and answerback.
+*	If the "S" block is not present, then an all-numeric string in the
+*	destination BIC field is assumed to be a telex number, with implied
+*	delivery by telex.
+*
+* A. Smith	10-Jul-2002
+*	Index by the BIC of the sender of a message outbound from SWIFT.
+*
+* A. Smith	15-Jul-2002
+*	Parse an additional optional subfield in the "{S:" block, containing
+*	the equivalent of a SWIFT service class field. This in turn becomes
+*	the source of the message, provided it is an allowed source as configured
+*	in the RMT record.
+*
+* A. Smith	16-Jul-2002	#86879
+*	Add support for direct internal routing of outbound-to-SWIFT messages
+*	that are addressed to an on-us BIC. By default, these will be sent to the
+*	internal rerouter by DISPOSE, which in turn creates a new TRN with a
+*	SWIFT output (i.e. inbound to us) header, routing to the SWFINQ.
+*	If the new RMT parameter "ON-US ROUTE FLAG" is set to "Y", then these
+*	messages are queued via message routing via the top-level history,
+*	and message routing should be set up to send them to the SWFINQ.
+*	SWFIN can map a message with a SWIFT input header.
+*	The value of all this is to allow the original message to be
+*	processed as a payment, rather than the derived message, so that
+*	when the original message is queued back to this link as an ACK, the
+*	results of the payment can be notified back to the originator.
+*	Add support for a message source-code override, by way of a sub-block
+*	in the optional "S:" block. The sub-block syntax is "{SRC:<source-code>}".
+*	Add SWIFT Alliance MQSA emulation. This setting is appropriate for an
+*	ISI2CBT receive instance if it is the client of an Alliance Access server,
+*	and is appropriate for an ISI2CBT send instance if MTS is emulating
+*	the alliance server.
+*
+* M. Harris	03-OCT-2002	# 82885
+*	Fix 4th argument to SCAN_DISPOSE.
+*
+* A. Smith	18-Oct-2002
+*	The message ID reference to locate the original message on the pending
+*	ack or pending dlvack queue is now parsed from the IO_INF string in the
+*	buffer prefix, with field 108 of the SWIFT-2 header as a fallback if not
+*	found there.
+*	Change the layout of IO_INF, IOST to accommodate the larger IO_INF string.
+*	The syntax of IO_INF is now <reply-to-queue>||<this-msg-id (MQ MsgId)>//<ack-msg-id (MQ correlation ID)>
+*
+* A. Smith	12-Nov-2002
+*	Use current time, not EVT_SYSTIME.
+*
+* A. Smith	20-Dec-2002
+*	If a datagram message is in fact a SWIFT ACK/NAK, then treat it as if it was a DLVACK (PAN/NAN or REPLY).
+*
+* A. Smith	9-Dec-2002	#93803
+*	Use RMT "DLV ACK KEY" config option to decide which key to use in matching delivery ack to original.
+*	Change {S: block sub-block code-word from "{SOURCE:" to "{SRC:"
+*	Default source code from RMT source-id if not populated by SRC: sub-block in {S: block
+*	Call MAP_FIELDS to parse the SWIFT text only if we are in server mode; in client mode this
+*	duplicates work that will be done by the SWFIN mapper.
+*
+* A. Smith	9-Jan-2003	#94388
+*	If the receive instance is running in client mode, then treat a received data message as
+*	inbound, regardless of the SWIFT header type being "I" vs "O"
+*
+* A. Smith	22-Jan-2003	#94498
+*	Message type from SWIFT header was being mapped as the outgoing message
+*	type when in client mode. This has now been restricted to server mode.
+*
+* E. Dulog	28-Feb-2003	#95223, #96479
+*	Delete item from the pending queue when a match is found.
+*
+* D. Alquist	16-Oct-2002	90164
+*	Correct argument count on MESSAGE_ROUTING call (was 8; should be 7).
+*
+* E. Dulog	02-Jan-2003	94024
+*	If source code in S block is not one of the OVERRIDE SOURCES, check
+*	if it is the default source id in the RMT and if it is, don't flag
+*	it as error. Also, ensure that invalid sources are routed to
+*	EXCeption.
+*
+* E. Dulog		15-Mar-2003	93644
+*	Check if implied header and if so, call the prercv api routine
+*	for application specific processing.
+*
+* A. Smith	12-Mar-2003	#96646
+*	For an inbound message, or an acknowledgement of an outgoing message, if there is
+*	an MRN sub-block within the S-block, then store it in the message history.
+*	If the RMT paramter "MRN INDEX" is set to "SENDREFNDX" or "MRN_NDX", then make a sender-reference
+*	index entry using the string following the "MRN:" in the sub-block in "SENDREFNDX" or
+*	<link name>"_MRN_NDX" respectively.
+*	Propagate authenticator status indicators in the "{S:" block to the authenticator
+*	state flag, the converse of the XMTMAP program which maps from the flag to the S-block.
+*
+* A. Smith	22-Apr-2003
+*	Allocate left-over sequence element without CHANGE. This technique honors the length
+*	in the instrument field, which is what we want in this case.
+*	Use %LONG for the length linkage argument to match VSTR length datatype.
+*
+* A. Smith    1-May-2003      #99472
+*	Don't go past block 5 when saving ACK message text to SYS_MEMO's
+*
+* A. Smith	15-May-2003	#100101
+*	Fix typos in message direction usage, and places that did not use the keywords
+*	but were still using the hard-coded underlying flag values. This was causing errors
+*	in the handling of messages to-SWIFT vs. from-SWIFT.
+*
+* A. Smith	12-Jun-2003	#101347
+*	For an outbound message received by a SERVER mode instance, set
+*	the message ownership of a received message by searching against the BIC-BRANCH
+*	found in the message header, which yields a bank-location combination.
+*
+* A. Smith	1-May-2003	#101405
+*	Don't try to set the source unless this is a new incoming message. Program was
+*	trapping if an original message was looked up after receiving an ACK and the
+*	original message had a blank source code field (this is not good practice
+*	for a message, but it was observed with CLS originated SWIFT messages and
+*	protection against the situation was added here).
+*
+* E. Dulog	22-Aug-2003	#99602
+*	Parse S-Block for "AUR:" tag (Autorepair), if present, map the 21 chars
+*	that follows the tag immediately into the change_fields of the FTR set
+*	and then call PRULE_MSG_UPDATE_PARAM.
+*
+* A. Smith	8-Sep-2003	#103223, 104778
+*	For incoming messages, make a receive MIR log on "SWF_F_RCV"
+*	For ACK of outgoing message, make send MIR log on "SWF_F_SND"
+*	For NAK of outgoing message, make send MIR log, and on "SWF_F_NAK"
+*	Also fix typo in which client mode instance set OUTBOUND as message
+*	direction, but should set INBOUND (i.e. CLIENT->inbound from SWIFT)
+*	Restructure evaluation of message type and RCV_IOSTAT, allowing
+*	redefinition as NAN.
+*	New convention for storing text of SWIFT ACK: store max of up to 2 "*SYS_MEMO" fields,
+*	for a total of 160 characters, including a prefix of "*ACKMSG:" on each memo
+*	Expand REF fields in headers from 16 to 24 characters to be
+*	compatible with MQ MsgId fields.
+*
+* A. Smith	10-Nov-2003	#103223
+*	Modify change of Sep 8. Log naming convention used there is not compatible
+*	with the LT abbreviation scheme used in SWFAPC and expected by the STOR extract.
+*	New naming convention looks up the 4-character LT abbreviation as the first entry in the
+*	SWF2_LT_TABLE. The 3 logs are then:
+*		<LT abbrev>_F_RCV	e.g. INTA_F_RCV
+*		<LT abbrev>_F_SND
+*		<LT abbrev>_F_NAK
+*	If the table is not found, then the LT abbreviation is formed by appending "A" to the first
+*	3 characters of the BIC in the bank union.
+*	If that is blank, then "A" is appended to the 3-character bank ID.
+*
+* A. Smith	17-Jan-2004	#108966
+*	If a SWIFT ACK is received in an ACK/DLVCNF/PAN or NAK/DLVREJ/NAN message, and the MIR
+*	can be parsed from it, then instead of making the "*ACKMSG" memo from the actual text,
+*	emulate SWF/APC by making a derived memo of the form "Ack MIR:" or "Nak MIR:".
+*	If a SEND SWF2 log is defined, then this becomes the message history memo on the log
+*	entry. Else a separate SYS_MEMO is made containing the SWF/APC style ACK memo.
+*
+*	Log all received messages onto the RCV log; previously, only new inbound messages were logged.
+*	The TXT field for the receive linelog now contains "RCVD MSG", "ACK", "DLV ACK", "BAD ACK" or
+*	"BAD DLV ACK".
+*
+* A. Smith	3-Feb-2004	#109291
+*	Make an additional message routing call with a hard-coded command of "ACK", and exit code set
+*	to "EXIT" so the presence of a routing entry is always optional. This is called
+*	unconditionally for a received message, and has no effect on whether DISPOSE is called to
+*	deliver the message to an output queue.
+*
+* E. Dulog	11-Feb-2004	#109993
+*	Check I/O message direction in the first char of vstr80 as opposed to the
+*	IO_ID field of the out_hdr_line2. Also, set msg type in the ftr set after
+*	a message or transaction has been allocated to avoid trapping due to
+*	SBJNOTCON error.
+*
+* E. Dulog	29-Mar-2004	#111050
+*	Set isi2 msg type to data_msg only if parse failed and current type is
+*	UNKNOWN because for COA/COD which is ack_msg type parse will always fail
+*	because it has no text to parse.
+*
+* E. Dulog	06-Apr-2004	#112107
+*	Make sure the parse for message type is consistent with isi2_msg_type
+*	oneof in isi2_fsect.ddl. Fix bug introduced by the changes made for
+*	111050 above.
+*
+* E. Dulog	16-Apr-2004	#112124
+*	Correct the parse command for "{AUR:" tag within the S-block.
+*
+* A. Smith	30-Apr-2004	#112217
+*	ENQ_CONFIRMATIONS and ENQ_SEC_WIR were not being called when a delivery acknowledgement
+*	for a primary wire was received.
+*
+* A. Smith	10-May-2004	#112683
+*	Add additional options for addressing telex messages.
+*	(1) <idtype>/<id> overlaying the 12-character SWIFT destination BIC in header2, with trailing spaces
+*	(2) {SNAM:<id>} or {CNAM:<id>} or {INAM:<id>} as a sub-block of the "{S:" trailer block.
+*	In both options, the <idtype>/<id> is used as the lookup key to an address record in the relationship
+*	file, and MTS will select the correct telex or private network routing information from this record
+*	to route the message, choosing a non-SWIFT routing method.
+*
+* A. Smith	14-May-2004
+*	FTR.TYP.TRAN_TYPE is now set to "SWF", since messages should be compatible with messages created using
+*	SWF message entry mode in ADE, even if they are being sent to non-SWIFT networks such as TELEX.
+*
+* A. Smith	4-Jun-2004	#113634
+*	Add support for new "{S:" block sub-blocks "RPRFLAGS" and "PRM".
+*
+* E. Dulog  17-Jun-2004 #111050
+*   Add diagnostic or debug code when no matching pending item is found
+*   for the ack, COAs in particular.
+*
+* E. Dulog  14-Jul-2004 #114018
+*   If dealing with ack msg type, copy io info data to temporary buffer to
+*   extract the correlid to be used as the ack msg ref when searching for
+*   the matching original message in the ack pend queue.
+*
+* A. Smith	24-Aug-2004	#115608
+*	Add support for messages without SWIFT header structure. These are stored as text messages,
+*	with special parsing of the first line of the message for telex delivery information
+*		26-Aug-2004
+*	Correct problem in use of DELETE: vs. DELETE_THEN_NEXT:
+*
+* D. Alquist	15-Oct-2004
+*	Added tracing
+*
+* E. Dulog   30-Nov-2004 #117602
+*   Increase size of override_sources_ws vstr variable from 40 to 80 to
+*   accomodate long list of RMT OVERRIDE SOURCES. Note that the RMT parameter
+*   value's maximum length is 80.
+*
+* E. Dulog  30-Nov-2004 #117738
+*   Set dst_set state to "D" if dlvack and to "N" if dlvrej.
+*
+* D. Albertsen	06-Dec-2004	#107844
+*		Added call to DAT_SET_PHASE for multi-phase support.
+*
+* E. Dulog  03-Dec-2004 #116680, #118156
+*   Set incoming_format to "SWF" and receive_char_count.
+*
+* C. McKenzie 03-Jan-2004	SPR#119114
+*	Added code to set the .txt field to the transaction reference number.  Logs
+*	and queues that can be scanned by by_logs_dump need to have this field set.
+*
+* E. Dulog  15-Mar-2005 #119148
+*   Create *LNK_INF: sys memo only if the DLV ACK KEY is set TRN-MSGID which
+*   means that the MQ MsgId and MQ CorrelId are very likely contain valid
+*   data that are recognizable and printable and will prevent msg_util from
+*   aborting due to NEX-F-STROVF, String field overflow.
+*
+* E. Dulog  19-Apr-2005 #119513
+*   Populate dst_typ of dst_set when ACCT_LOOKUP failed and idtype is S (SWF)
+*   to work the same as swfstmt and INQ will display the SWF BIC which is
+*   the same as the route id.
+*
+* E. Dulog  24-May-2005 #122707
+*   Fix what may have been a typo error - Tmp_big_vstr_length -> Tmp_vstr_length
+*   after successful parse of "{TEST:}" in S-block.
+*
+* D. Alquist	23-Sep-2005
+*	126027: Convert from legacy NEX_SWF_MAP_APDU_TO_TXT_ENV to newer
+*	NEX_SWF_MAP_DATA.
+*
+* D. Alquist	1-Nov-2005
+*	126104: Add tracing
+*
+* T. Carroll	04-Nov-2005	#115816
+*	Migrate logic to support duplicate checking into the base line product.
+*
+* A. Sowers		08-Mar-2006	#129284
+*	Corrected the parse of the {405 tag following the {451 tag in a received
+*	NAK to extract the reason code.
+*
+* T. Carroll	03-Apr-2005	#130014
+*	Change call from the old  NEX_SWF_MAP_APDU_TO_TXT_ENV to the new
+*	NEX_SWF_MAP_DATA. 
+*
+* D. Alquist		6-Oct-2006
+*	133508: Fix segmentation fault.  Reimplement messy tmp_big_vstr parse into subject parse.
+*
+* D. Alquist		9-Nov-2006	#134146
+*	Special handling for feedback code = 19.  Seems to be associated with MT019
+*	(delayed nak).
+*	Do not convert this into a DLVREJ in paragraph b210.  Process it through
+*	as type=datagram and allow the msg to be routed by the mapper behind us.
+*	As a DLVREJ, we were trying in vain to find it on the PNDDLVACKQ, but it
+*	had already been removed from there by a previous swift ack.
+*
+* D. Alquist		29-Sep-2007	140598
+*	Acks failing to match due to trailing nulls in correlid.  Convert to spaces
+*	prior to pending queue match.
+*
+* D. Alquist		11-Dec-2007	140956
+*	Correct problem with log connection during one-time initialization:
+*	xxxx_F_SND, RCV, etc. are length=10, not length=12.
+*	Also trace LT abbreviation to facilitate troubleshooting.
+*
+* T. Carroll   		08-Feb-2008	CR1163
+*	We now send the ACK/NAK string of text off to message_routing via the
+*	memo parm so message_routing can insert it into the memo field of the
+*	join to the target queue.
+*
+* D. Alquist		18-Feb-2008	452081, 454788 (CR1077)
+*	Log outbound msgs that rcv +ve logical ack onto SWF_DST_NDX,
+*	if index is allocated.  Destination address is placed into dst.dst_outgoing_ref
+*	by xmtedt module, and recovered here for the index;
+*	dst_outgoing_ref is subsequently overwritten with the actual ack/nak info.
+*	isi2cbt has never maintained this index, although swfapc does.
+*	swfapc stores the DST: address in the PNDQ join, and recovers it from there
+*	when the logical ack arrives.  isi2 does not use a pndq so we use dst_outgoing_ref
+*	instead.
+*	This is done in client mode only (i.e. we are interfacing with a SWIFT
+*	front-end).
+*
+* D. Alquist		24-Mar-2008
+*	Tweak last change: use BIC8 if ending in "XXX".
+*
+* R. Jhawar		29-Jul-2009
+*       Fix problem where an attempt was made to populate message fields when the received
+*       message is an ACK of a previous message. In this scenario, we are operating on the
+*       delivery sub-history of the original, and are locked against changing fields in the
+*       (in this example) FTR set.
+*       Migration of CR10009 in 2.0
+*
+* J. Pfaff		09-Dec-2009
+*	Migrate CR11623 from v2.0
+*      	Move MIR from header 2 record to ftr_set.incoming_ref.  
+* End Modification History
+******************************************************************************
+
+
+* Note that this routine is called both for incoming data messages,
+* and also for incoming application control messages.
+* INPUT:
+*   RCVBUF_SEQ_LS = Current msg sequence number (0 if ctl msg)
+*   RCVBUF_REF_LS = Current msg reference (SPACES if ctl msg)
+*   ISI2_MSG_HDR initialized.  FLAGS_REC(1:1) indicates whether
+*	this is a data ("D") or control ("C") message.
+*   RCV_TEXT_SEQ = Data
+*   If control message:
+*     CTL_FLAGS_REC initialized
+*   If data message:
+*     DATA_FLAGS_REC initialized
+* OUTPUT:
+*   RCVBUF_MEMO_LEN_LS:
+*	Length of the memo returned in RCVBUF_LEN_LS.
+*   RCVBUF_MEMO_LS:
+*	Memo field.
+*-----------------------------------------------
+*
+%DEF <ACE>		%`SBJ_DD_PATH:ace_fsect.ddl` %END
+%DEF <ENTFTR>		%`SBJ_DD_PATH:entftr_fsect.ddl` %END
+%DEF <ISI2>		%`SBJ_DD_PATH:isi2_fsect.ddl` %END
+%DEF <ISI2API>		%`SBJ_DD_PATH:isi2api_fsect.ddl` %END
+%DEF <FFANT>		%`SBJ_DD_PATH:ffant_fsect.ddl` %END
+%DEF <MAP>		%`SBJ_DD_PATH:map_fsect.ddl` %END
+%DEF <EXP_KEY>		%`SBJ_DD_PATH:exp_key_fsect.ddl` %END
+%DEF <RMT>		%`SBJ_DD_PATH:RMT_FSECT.DDL` %END
+%DEF <SWF2FMT>		%`SBJ_DD_PATH:SWF2FMT_FSECT.DDL` %END
+%DEF <MTS_MQ>		%`SBJ_DD_PATH:mts_mq_fsect.ddl` %END	%^%^%^TODO remove this def when B210_io_status_code is made into a site-sub
+
+%DEF
+mrn_index:	que(	%`SBJ_DD_PATH:GEN_VSTR_INDEX.DDF`);
+mrn_index_qid:	rec(	%`SBJ_DD_PATH:PRIV_ITEM_REC.DDF`);
+fin_rcv_swf2log:que(	%`SBJ_DD_PATH:SWF2_LOG.DDF`);
+Fin_rcv_swf2log_name: VSTR(12);
+fin_snd_swf2log:que(	%`SBJ_DD_PATH:SWF2_LOG.DDF`);
+Fin_snd_swf2log_name: VSTR(12);
+fin_nak_swf2log:que(	%`SBJ_DD_PATH:SWF2_LOG.DDF`);
+Fin_nak_swf2log_name: VSTR(12);
+swf_dst_ndx:	que(	%`SBJ_DD_PATH:gen_vstr_index.ddf`);
+swf_dst_ndx_name:     VSTR(12);
+
+Isi2_lt_abbr:	STR(4);
+rcv_ref:	VSTR(24);	%^ Scratch -- for msg receipt logging
+orig_msg_wf:	ONEOF(Rcvd_msg,Acked_msg,Unmatched_ack);
+mr_cmnd_ws:	STR(3);
+mr_error_ws:	STR(8);
+Routing_error_wf: Boolean;
+msg_direction_wf: ONEOF(Inbound,Outbound,On_us, Unknown);	%^ Outbound means input to SWIFT
+reroute_mode_wf: ONEOF(noinit,internal_reroute,direct_route);
+Valid_syntax_wf: Boolean;
+Override_sources_wf: Boolean;
+Override_sources_ws: Vstr(80);								%^ #117602
+MQSA_emulation_wf: ONEOF(noinit, MQSA_disabled, MQSA_enabled);
+MQSA_UMID_field_len: LONG = <45>;
+Swf_que_id_ws: rec(%`SBJ_DD_PATH:PRIV_ITEM_REC.DDF`);
+on_us_mr_cmnd:	STR(3);
+rcv_iostat:	LONG;
+search_currency: STR (3);
+Our_tid_ws:	REC (
+      In_Adr:	  	STR(8);
+      In_Tid:		STR(1);
+      In_Branch_Cd: 	STR(3));
+Lcl_bank_ws:	STR(3);
+Lcl_loc_ws:	STR(6);
+Lcl_mir:	VSTR(28);
+Lcl_reason:	VSTR(6);
+Lcl_actg_mode:	oneof(	%`SBJ_DD_PATH:ACCOUNTING_MODE_ONEOF.DDF`);
+Lcl_cnf_flag:	LONG;						%^ 1 for debits, 2 for credits, 3 both
+Lcl_acktype:	STR(1);
+Lcl_dest_id_ws:	STR(64);
+
+dup_osn_log:		 Que(%`SBJ_DD_PATH:gen_vstr_index.ddf`);
+compose_ws:		     Compose(^NOTRAP);
+parse_ws:		     Parse(^NOTRAP);
+Src_dup_rmt_wf:      Oneof(noinit, SDC_disabled, SDC_enabled);
+rcv_src_ws:          vstr(3);
+rmt_src_ws:          vstr(3);
+dup_memo_ws:         vstr(80);
+src_parm_value_ws:   vstr(80); 
+osn_ws:	             vstr(12);
+Src_dup_found_wf:    ONEOF(dup_osn_found, no_dup_osn_found);
+
+vReplyToQueue:	vstr(48);
+vMsgIdHex:	vstr(48);
+vCorrelidHex:	vstr(48);
+sCorrelid:	str(24);
+
+Nan_msg_ws:	VSTR(80);
+Cbtrcv_init:	Boolean;
+search_banks_flag: STR (1) = "F";	%^"F" = no cross-bank searches
+suppress_ambig_flag: STR(1) = "F";	%^Don't suppress
+zero_ws:	LONG = <0>;
+acct_look_pend_del: STR(1);
+blank_carrier:	STR(4) = "    ";
+wire_svc:	STR(3);
+bytecnt:	LONG;			%^ Processed byte count
+eod_mst_err:	STR="Unexpected CUST EOD message received.";
+sod_mst_err:	STR="Unexpected CUST SOD message received.";
+nyi_msg:	STR="CTL message processing not yet implemented.";
+unk_msg:	STR="Unknown application control message received.";
+lcl_msgbuf:	VSTR(20000);
+s_block_ws:	VSTR(1000);
+tmp_memo:	VSTR(80);
+tmp_time:	Time;
+tmp_yymmdd:	STR(6);
+dest_que_name_ws:	Rec( %`SBJ_DD_PATH:PRIV_ITEM_REC.DDF`);  %^ 4th calling argument to SCAN_DISPOSE
+qrt_key_rec: REC(%`SBJ_DD_PATH:priv_item_rec.ddf`);
+Prm_prefix_vstr: Vstr(80);
+Rprflags_update_allowed: Boolean;
+
+%^ Parameter processing											%^ #99602
+
+Prm_name_ws:        Vstr(40);
+Prm_value_ws:       Vstr(80);
+Prm_memo_ws:        Vstr(80);
+Prm_level_wo:       Oneof(%`SBJ_DD_PATH:PRULE_LEVEL_ONEOF.DDF`);
+Prm_source_wo:      Oneof(%`SBJ_DD_PATH:PRULE_SOURCE_ONEOF.DDF`);
+Prm_edit_wo:        Oneof(%`SBJ_DD_PATH:PR_PARAM_EDIT_ONEOF.DDF`);
+Prm_remaining_ws:   Long;
+Prm_status_wf:      Boolean;
+Prm_cust_mode_wf:   Boolean;
+Prm_present_wf:     Boolean;
+Prm_time_on_ws:     Time;
+Prm_time_off_ws:    Time;
+Prm_type_ws:        Str(1);
+
+Message_type:		Str(3);										%^ #109993
+Tmp_msg_history:	SEQ(%`SBJ_DD_PATH:MSG_HISTORY_SEQ.DDF`);					%^ #122666
+Tmp_hist_status:	Boolean;									%^ #122666
+%END
+
+%WORK
+COPY "isi2_global_fdf.cob".
+
+%LINKAGE
+01 rcvbuf_seq_ls	%long;
+01 rcvbuf_ref_ls	%str(24);
+01 rcvbuf_memo_len_ls	%long;
+01 rcvbuf_memo_ls	%Str(80);
+
+%PROCEDURE USING
+  rcvbuf_seq_ls,
+  rcvbuf_ref_ls,
+  rcvbuf_memo_len_ls,
+  rcvbuf_memo_ls.
+
+a00_main.
+
+* Do one-time initialization if not done yet
+	IF Failure_is in Cbtrcv_init
+	  Set Success_is in Cbtrcv_init TO TRUE
+
+	  PERFORM B30_get_lt_abbrev THRU B30_get_lt_abbrev_end			%^ Get 4-character LT abbreviation
+	  PERFORM B40_init_logs_and_params THRU B40_init_logs_and_params_end
+	  %BEG tmp_prs ^SPACE_SKIP; %END
+
+	END-IF.
+
+* If implied header is indicated, call the prercv api routine to check if
+* there's additional or special processing required specific to the application
+* like filtering the message so that it will not fall through for complete
+* processing.
+
+	IF (implied_header IN prm_header_format)
+	THEN
+	  CALL api-prercv-rtn-ptr USING
+		BY REFERENCE rcvbuf_seq_ls
+		BY REFERENCE rcvbuf_memo_ls
+		BY REFERENCE rcvbuf_memo_len_ls
+	  IF (rcvbuf_memo_len_ls > 0)
+	  THEN
+	    IF (rcvbuf_memo_ls(1:6) = "*CTLMSG")
+	    THEN
+
+* It is an indication that it is a custom application control message which has
+* been processed already by the prercv api routine and needs to erase it so
+* that the lnk subs will not re-act on it. Maybe consider adding the control
+* message below where EOD, SOD, etc. are processed.
+
+	      MOVE SPACES TO rcvbuf_memo_ls
+	      MOVE 0 TO rcvbuf_memo_len_ls
+	    END-IF
+	    GO TO a00_main_end
+	  END-IF
+	END-IF.
+
+* Case on message type
+	EVALUATE flags_rec OF isi2_msg_hdr(1:1)
+	  WHEN msg_type_data
+	    PERFORM a10_data THRU a10_data_end
+	  WHEN msg_type_ctl
+	    PERFORM a20_ctl THRU a20_ctl_end
+	  WHEN OTHER
+	    %LIBSTOP "ISI2$SE_ISI2API_RCVBUF_BADPARAM";	%^ SE
+	END-EVALUATE.
+
+a00_main_end.
+	EXIT PROGRAM.
+
+a10_data.
+* Incoming data message.
+* We need to log something onto the LINELOG, to account for the incoming
+* sequence number.
+* If it is an actual incoming message, allocate a message union and log it
+* onto the LINELOG.
+* If it is a DLA, then find the original, and log _that_ on the LINELOG; or
+* at least make a STATUS_LOG entry.
+
+*^^ Test if metastate precludes data message transmission from source,
+*^^ and return protocol error if so.
+
+* Get the message type from the first line of the temporary sequence. Maybe followed by [,IO=<io-inf>[,IOST=<io-stat>]]
+	MOVE 0 TO tmp_vstr_length.
+	MOVE 0 TO Tmp_memo_length, rcv_iostat.
+	MOVE 0 TO Tmp_big_vstr_length.                              %^ #114018
+
+	%BEG
+	FIRST: rcv_text_seq;
+	%END.														%^ #114018
+
+* Trace some implicit inputs
+	call "NEX_LNK_TRACE_DATA" using
+	  by value trace_ctx_blk of trace_ctx_rec,
+	  by content z"rcvbuf a10 - rcv_text_seq",
+	  by value txt_length of rcv_text_seq_lengths,
+	  by reference txt of rcv_text_seq,
+	  by value trace_asc.
+	call "NEX_LNK_TRACE_DATA" using
+	  by value trace_ctx_blk of trace_ctx_rec,
+	  by content z"rcvbuf a10 - isi2_msg_type",
+	  by value %siz(isi2_msg_type),
+	  by reference isi2_msg_type,
+	  by value trace_asc.
+
+	%BEG
+	tmp_prs ^IN(rcv_text_seq.txt), "::",
+		tmp_oneof (^ONEOF (		%^ WARNING: MAKE SURE THIS IS CONSISTENT WITH ISI2_MSG_TYPE ONEOF in isi2_fsect.ddl	#112107
+				"UNKNOWN","DATA","REQUEST","REPLY","DLVACK","DLVNAK","ACK"));
+	%END.
+	IF Failure_is in tmp_prs_status AND							%^ #111050
+	   NOT( ack_msg in isi2_msg_type )							%^ #111050
+	  SET data_msg in isi2_msg_type TO TRUE
+	ELSE IF ( ack_msg in isi2_msg_type AND						%^ #111050
+			  txt_length of rcv_text_seq_lengths = ZERO )
+	  CONTINUE
+	ELSE
+	  MOVE tmp_oneof TO isi2_msg_type
+	  %BEG tmp_prs tmp_oneof(^ONEOF (/, (",IOST=", | rcv_iostat, /))); %END
+	  IF (tmp_oneof = 0) OR (Failure_is in tmp_prs_status)
+	    MOVE 0 TO rcv_iostat
+	  END-IF
+* Reassemble IO_INF which can be up to 2 lines of data
+	  IF Txt of Rcv_text_seq (1:3) = "IO="
+	    IF (Txt_length of Rcv_text_seq_lengths = %SIZ(Rcv_text_seq.Txt))
+		AND Txt of Rcv_text_seq (%SIZ(Rcv_text_seq.Txt):1) = "-"
+	      SUBTRACT 4 FROM Txt_length of Rcv_text_seq_lengths GIVING Tmp_long
+	      MOVE Txt of Rcv_text_seq (4:Tmp_long) TO Tmp_big_vstr (1:Tmp_long)
+	      MOVE Tmp_long TO Tmp_big_vstr_length
+	      %BEG NEXT: Rcv_text_seq; %END
+	      MOVE Txt of Rcv_text_seq (1:Txt_length of Rcv_text_seq_lengths) TO
+			Tmp_big_vstr (Tmp_big_vstr_length + 1:Txt_length of Rcv_text_seq_lengths)
+	      ADD Txt_length of Rcv_text_seq_lengths TO Tmp_big_vstr_length
+	    ELSE
+	      SUBTRACT 3 FROM Txt_length of Rcv_text_seq_lengths GIVING Tmp_big_vstr_length
+	      MOVE Txt of Rcv_text_seq (4:Tmp_big_vstr_length) TO Tmp_big_vstr (1:Tmp_big_vstr_length)
+	    END-IF
+	    %BEG NEXT: Rcv_text_seq; %END
+	  END-IF
+	END-IF.
+
+	PERFORM B210_io_status_code THRU B210_io_status_code_end.		%^ May re-interpret type
+
+	IF (Tmp_big_vstr_length = ZERO AND                              %^ #114018
+		ack_msg IN isi2_msg_type )
+	  MOVE io_inf_blk(1:io_inf_blk_length) TO Tmp_big_vstr(1:io_inf_blk_length)
+	  MOVE io_inf_blk_length TO Tmp_big_vstr_length
+	END-IF.
+
+* Parse MQ elements from TMP_BIG_VSTR into vReplyToQueue, vMsgidHex, vCorrelidHex.
+	perform b500_parse_mqdata thru b500_parse_mqdata_end.
+
+* Trim sender ref and store in local VSTR
+* Truncate to the size of the TRN ref length
+	MOVE %SIZ(rcv_ref) TO rsts.
+	CALL "ISI2_GET_REAL_LENGTH" USING
+	  BY REFERENCE rcvbuf_ref_ls
+	  BY VALUE rsts
+	  RETURNING rcv_ref_length.
+	IF rcv_ref_length > %SIZ(ref_index.ref) MOVE %SIZ(ref_index.ref) TO rcv_ref_length END-IF.
+	MOVE rcvbuf_ref_ls TO rcv_ref.
+
+	call "NEX_LNK_TRACE_DATA" using
+	  by value trace_ctx_blk of trace_ctx_rec,
+	  by content z"rcvbuf a10 - rcv_ref",
+	  by value rcv_ref_length,
+	  by reference rcv_ref,
+	  by value trace_asc.
+
+* If MQSA emulation is in effect, strip off the UMID header preceding the SWIFT message text.
+* If the next text line is not long enough to contain this string, then don't strip anything
+	IF noinit in MQSA_emulation_wf
+	  %BEG SEARCH: rmt_parameter_seq(Key = "MQSA EMULATION"); %END		%^ First-time-only search
+	  IF Parameter_value of Rmt_parameter_seq = "T"
+	    THEN SET MQSA_enabled IN MQSA_emulation_wf to TRUE
+	    ELSE SET MQSA_disabled IN MQSA_emulation_wf to TRUE
+	  END-IF
+	END-IF.
+
+	If (MQSA_enabled IN MQSA_emulation_wf) AND NOT (txt_length of rcv_text_seq_lengths < MQSA_UMID_field_len)
+	  MOVE MQSA_UMID_field_len TO Tmp_offset
+	  SUBTRACT MQSA_UMID_field_len FROM txt_length of rcv_text_seq_lengths
+	ELSE
+	  MOVE 1 TO Tmp_offset
+	END-IF.
+
+* Initialize local message buffer to assemble text into
+	MOVE 0 TO lcl_msgbuf_length.
+
+* Copy all data following the message type line data into buffer for MAP_APDU call.
+* Truncate text that won't fit (can't happen for a valid SWIFT message)
+	PERFORM UNTIL (Seq_end_is IN rcv_text_seq_cursor)
+	  ADD txt_length of rcv_text_seq_lengths TO lcl_msgbuf_length GIVING tmp_long
+	  IF tmp_long > %SIZ(lcl_msgbuf)
+	    %BEG END: rcv_text_seq; %END
+	  ELSE
+	    MOVE txt of rcv_text_seq (1:txt_length of rcv_text_seq_lengths) TO
+					lcl_msgbuf (lcl_msgbuf_length + 1: txt_length of rcv_text_seq_lengths)
+	    MOVE tmp_long TO lcl_msgbuf_length
+	    %BEG NEXT: rcv_text_seq; %END
+	  END-IF
+	END-PERFORM.
+
+* Check to see if a datagram message is in fact a SWIFT ACK/NAK. If so, change the ISI2 message type to DLVACK
+	IF data_msg in isi2_msg_type
+	  %BEG tmp_prs ^IN(lcl_msgbuf), "{1:F21"; %END
+	  IF Success_is in tmp_prs_status THEN
+	    Set dlvack in isi2_msg_type to TRUE
+	  END-IF
+	END-IF.
+
+* Parse SWIFT header fields. If no SWIFT header present, LCL_MIR_LENGTH=0.
+	PERFORM B90_PARSE_HDR THRU B90_PARSE_HDR_END.
+
+	SET Rcvd_msg in Orig_msg_wf TO TRUE.				%^ Assume this is a new received message, not an ACK
+
+	If NOT ((data_msg in isi2_msg_type) or (request_msg in isi2_msg_type))
+* This is a response to a message we sent (ACK, DLVACK/NAK or REPLY): look up original by sender ref. If not found, treat
+* like original message so we keep track of it
+	    PERFORM B100_match_ack THRU b100_match_ack_end
+	END-IF.
+
+*122666
+* WARNING: The subject does not necessarily mean it is connected to the object
+*			the subject name implies. Like ent_msg_history in this program is
+*			most of the time, if not always, connected to sub-history object
+*			and NOT the msg or main history object. This is the reason why
+*			Tmp_msg_history is newly defined to be used to check if we can
+*			lock the message if and only if the credit set will be very likely
+*			to be updated in x60_dlv_actions paragraph. It is done here or early
+*			so we can avoid wasting time creating all kinds of logs and updates
+*			and later on we can't update the credit set because of a collision
+*			or object lock wait with potentially another isi2 _RCV process 
+*			trying to update it as well because the same message was queued to
+*			2 separate isi2 _SND lines.
+
+	IF Acked_msg in orig_msg_wf AND
+		(Dlvack in isi2_msg_type OR
+		 Dlvrej in isi2_msg_type )
+	THEN
+		%^ it is a dlvack/nak so we know the matching original message is found
+		%^ and subjects are already in place.
+    	IF ( Idname Of Qname Of Ent_msg_history(1:4) = "*DST" AND
+			 NOT( Admin In Msgtype Of Ent_msg_union ) )
+		THEN
+			%^ it's a dest set and not an admin type message so now let's check
+			%^ if we can lock the message.
+			%BEG
+			BREAK: Tmp_msg_history;
+			Tmp_msg_history( NOTRAP, NOMOD_WAIT );
+			Ent_msg_union.Msg_history CONN: Tmp_msg_history( MOD );
+			Tmp_hist_status = Tmp_msg_history status;
+			Tmp_msg_history( ETRAP, MOD_WAIT );
+			%END
+
+			IF ( Failure_is In Tmp_hist_status )
+			THEN
+				%^ someone got the message locked already so we'll tell
+				%^ isi2_lnk_subs we can't process the dlvack/nak yet and put
+				%^ it back in the queue and try processing it again later.
+				%BEG Proerr_vstr = "*BUSY"; %END
+				CALL "DAT_BREAK_MSG"
+				Go To a10_data_end
+			END-IF
+		END-IF
+	END-IF.
+
+	IF NOT (Acked_msg in orig_msg_wf)
+
+* The message is an original, or this is a response message, but the sender-ref was not found - in which case we
+* treat it as an original incoming message because there is no original to tie it to
+* Allocate a message union to store it in
+	  Call "DAT_SET_PHASE"
+
+	  CALL "DAT_ALLOC_MSG" USING
+		BY VALUE 0
+		BY REFERENCE lnk_msg_src_str
+		BY REFERENCE link_bnk_id
+		BY CONTENT Z"F"
+
+* Set incoming message type saved from B90_PARSE_HDR
+	  %BEG														%^ #109993
+	  Ent_ftr_set.Incoming_msgtype = Message_type;
+%^ #116680
+      Tmp_prs ^IN(isi2_msg_hdr.byte_count) Ent_ftr_set.receive_char_count(^NUM<6>(^Leading_zeros));
+	  %END
+      IF (FAILURE_is IN Tmp_prs_status)
+        %BEG
+        Tmp_prs ^IN(isi2_msg_hdr.byte_count) Ent_ftr_set.receive_char_count(^NUM<6>(^NoLeading_zeros));
+        %END
+      END-IF
+
+      IF (Message_type NOT = SPACES)                            %^ #118156
+        %BEG Ent_ftr_set.Incoming_Format = "SWF"; %END
+      END-IF
+
+* If server mode, this is an outbound message and the message type should appear
+* as it does for an ISI or ADE message
+* Also search for the bank/location matching the <bic><branch> found in the message header, if any
+	  IF server_mode in prm_client_server_mode
+	    %BEG
+	    ent_ftr_set.typ.tran_type = "SWF";
+	    ent_ftr_set.type_code = ent_ftr_set.incoming_msgtype;	%^ Set message type for message-routing use
+	    %END
+	  END-IF
+
+* Store sender's reference, if provided, in ftr.incoming_ref
+	  IF (NOT(rcv_ref_length = 0))
+	    %BEG ent_ftr_set.incoming_ref = rcv_ref; %END
+	  END-IF
+
+* If present, store the MIR from B90_PARSE_HDR in the incoming reference
+          IF (NOT(Lcl_mir_length = 0))
+              %BEG ent_ftr_set.incoming_ref = Lcl_mir; %END
+          END-IF
+
+* Flag message PDM, if so marked by sender.
+	  IF (pdm_flag OF data_flags_rec = pdm_type_t)
+	    %BEG ent_ftr_set.flgs.pdm_flg = "T"; %END
+	  END-IF
+
+* If the link instance is in "CLIENT" mode, then treat all messages as inbound (i.e. from SWIFT to MTS)
+* Otherwise, if SERVER mode or not specified, and the message is outbound (i.e. has a SWIFT input header), then
+* see if it on the configured list of on-us BIC's (these are BIC's for which the SWIFT input message should be
+* directly placed on the input mapping queue as if it had been received from SWIFT; this is different from the
+* "internal rerouter" scenario, in which a new message with a SWIFT output header is created from the original
+* message, and the new message is placed on the input mapping queue)
+
+	  IF client_mode in prm_client_server_mode
+	    Set Inbound in Msg_direction_wf to True
+	  END-IF
+
+	  IF Outbound in msg_direction_wf
+* If to-SWIFT message is addressed to an on-us BIC, then treat as if incoming from SWIFT, not outgoing to SWIFT
+	    PERFORM B200_CHECK_ON_US THRU B200_CHECK_ON_US_END
+	  END-IF
+
+* If this is a message from SWIFT, index by the sending BIC
+	  IF Inbound in msg_direction_wf
+	    PERFORM x20_sndndx_join THRU x20_sndndx_join_end
+	  END-IF
+
+	END-IF.
+
+* Map the data to ENT_TEXT_SEQ by parsing the SWIFT formatted buffer
+* For an ACK in which the original was found, a dummy ENT_TEXT_SEQ is used
+	IF Acked_msg in orig_msg_wf
+	  %BEG
+	  BREAK: ent_text_seq;
+	  ALLOC_TEMP: ent_text_seq(mod);
+	  %END
+	END-IF.
+
+    PERFORM B250_check_dups THRU B250_check_dups_end.
+
+* Log message onto RCV log.
+	PERFORM x10_rcv_log THRU x10_rcv_log_end.
+
+	If dup_osn_found in Src_dup_found_wf
+	   Go to a10_data_cleanup
+	End-if.
+
+* If an explanatory message has been saved related to a PAN, write to history
+	IF Nan_msg_ws_length > 0
+	  %BEG
+	  ALLOC_END: ent_msg_history (mod,
+				 .qname(
+					.idbank  = Link_bnk_id,
+					.idloc   = NULL,
+					.idname  = "*SYS_MEMO"),
+				 .qtype = "OBJTYP$_NULL",
+				 .memo  = Nan_msg_ws);
+	  %END
+	END-IF.
+
+* If this is an ACK that could not be matched, make a SYS_MEMO to record this
+	IF Unmatched_ack in orig_msg_wf
+	  %BEG
+	  ALLOC_END: ent_msg_history (mod,
+				 .qname(
+					.idbank  = Link_bnk_id,
+					.idloc   = NULL,
+					.idname  = "*SYS_MEMO"),
+				 .qtype = "OBJTYP$_NULL",
+				 .memo  = "ACK or DLV ACK could not be matched to a pending item");
+	  %END
+	END-IF.
+
+* Trace inbound text
+	call "NEX_LNK_TRACE_DATA" using
+	  by value trace_ctx_blk of trace_ctx_rec,
+	  by content z"cbt rcvbuf (1)",
+	  by value lcl_msgbuf_length,
+	  by reference lcl_msgbuf,
+	  by value trace_asc.
+
+* Map SWIFT/non-SWIFT text data to message text sequence
+	IF Lcl_mir_length = 0
+	  perform b400_map_nonswf_text thru b400_map_nonswf_text_end
+	ELSE
+	  perform b300_map_swf_text thru b300_map_swf_text_end
+	END-IF.
+
+* If we are on the server side, attempt to populate message from SWIFT fields, including amount and sender reference
+* If we are on the client side, assume this will be done when the message goes through SWFIN
+* Also, if on the server side, derive the bank-loc ownership of the message from the sending tid, if parsed from header
+
+	MOVE 0 TO tmp_long.				%^ No special mapping
+	IF (server_mode in prm_client_server_mode)
+           AND (Rcvd_msg in Orig_msg_wf)                %^ Only if server mode, and new inbound message
+	  IF Our_tid_ws NOT = SPACES
+	    CALL "BIC_TO_BANKLOC" USING
+		BY REFERENCE In_Adr of Our_tid_ws
+		BY REFERENCE In_Branch_Cd of Our_tid_ws
+		BY REFERENCE Lcl_bank_ws
+		BY REFERENCE Lcl_loc_ws
+		RETURNING ReturnStatus
+	    IF Success_is in ReturnStatus
+		AND ((Lcl_bank_ws NOT = Bank of Loc_info of Ent_ftr_set) OR (Lcl_loc_ws NOT = Loc of Loc_info of Ent_ftr_set))
+		%BEG Ent_ftr_set.Loc_info (.Bank = Lcl_bank_ws, .Loc = Lcl_loc_ws); %END
+	    END-IF
+	  END-IF
+	  CALL "MAP_FIELDS" USING
+		BY REFERENCE tmp_long
+		RETURNING rsts
+	END-IF.
+
+* If the message has an "{S:" block, pack it out into a string, up to size of S_BLOCK_WS string
+	%BEG LAST: Ent_text_seq; %END.
+	PERFORM UNTIL Ent_text_seq (1:3) = "{S:"
+			OR Ent_text_seq (1:3) = "{5:"
+			OR Ent_text_seq (1:2) = "-}"
+			OR Seq_beg_is in Ent_text_seq_cursor
+	    %BEG PREV: Ent_text_seq; %END
+	END-PERFORM.
+	MOVE 0 TO S_block_ws_length.
+	IF Ent_text_seq (2:2) = "S:"
+	  PERFORM UNTIL Seq_end_is in Ent_text_seq_cursor
+	    SUBTRACT S_block_ws_length FROM %SIZ(S_block_ws) GIVING Tmp_long		%^ Free space
+	    IF Tmp_long > Txt_length of Ent_text_seq_lengths
+	      MOVE Txt_length of Ent_text_seq_lengths to Tmp_long
+	    END-IF
+	    MOVE Txt of Ent_text_seq (1:Tmp_long) TO S_block_ws (S_block_ws_length + 1:Tmp_long)
+	    ADD Tmp_long TO S_block_ws_length
+	    %BEG NEXT: Ent_text_seq; %END
+	  END-PERFORM
+	END-IF.
+
+* If delivery response, copy the response text into message history
+* (ACK/NAK responses just get logged on the input log - the returned data for an MQ COA or COD is a copy of 1st 100 bytes so
+* we don't store it back into the message). Stop when S-block or end of message is reached. Assumption is that the message
+* has some data before the start of any S-block.
+
+	%beg api_vstr80 = NULL; %End
+	EVALUATE TRUE
+	  WHEN dlvack in isi2_msg_type
+	  WHEN dlvrej in isi2_msg_type
+
+* If the MIR was parsed from the SWIFT header, make a SWIFT ACK/NAK memo string of the form
+* "ACK MIR: ...", and it will be used in X30 as the message-history memo string of the SWF2 log entry.
+* If the ACK message could not be parsed as a SWIFT ACK (F21) message, then store the
+* actual text of the ACK message (up to 2 lines of message-history SYS_MEMO entries), with
+* the prefix "*ACKMSG:"
+
+	    IF Lcl_mir_length = 0						%^ If unable to extract MIR from header
+	      PERFORM X50_ACKMSG_MEMOS THRU X50_ACKMSG_MEMOS_END
+	    END-IF
+
+	    MOVE mr_ack_error_code TO mr_error_ws
+	    PERFORM B80_parse_mrn THRU B80_parse_mrn_end			%^ Get the MRN from the S-block if present
+	    IF dlvrej in isi2_msg_type
+	      MOVE mr_dlvnak_cmnd_msg_code to mr_cmnd_ws
+	      %Beg Tmp_vstr = NULL; %End
+	      PERFORM x30_snd_mirlog_and_memo THRU x30_snd_mirlog_and_memo_end	%^ Make outbound message MIR log
+	      If Tmp_vstr_length > 0
+		 %Beg api_vstr80 = Tmp_vstr; %End
+	      End-if		
+	      PERFORM X35_nak_mirlog THRU X35_nak_mirlog_end			%^ Make outbound message NAK MIR log
+	    ELSE
+	      MOVE mr_dlvack_cmnd_msg_code to mr_cmnd_ws
+	      %Beg Tmp_vstr = NULL; %End
+	      PERFORM x30_snd_mirlog_and_memo THRU x30_snd_mirlog_and_memo_end	%^ Make outbound message MIR log
+	      If Tmp_vstr_length > 0
+		 %Beg api_vstr80 = Tmp_vstr; %End
+	      End-if
+* SWF_DST_NDX made only upon +ve logical ack
+	      perform x70_swf_dst_ndx thru x70_swf_dst_ndx_end
+	    END-IF
+
+* If this is the delivery acknowledgment of the primary or secondary wire, dispatch related messages
+	    PERFORM X60_DLV_ACTIONS THRU X60_DLV_ACTIONS_END
+
+* If no routing command, skip msgrout call
+	    IF mr_cmnd_ws = SPACES THEN GO TO a10_data_cleanup END-IF
+
+	  WHEN ack_msg IN isi2_msg_type
+
+	    MOVE mr_ack_cmnd_msg_code to mr_cmnd_ws
+	    MOVE mr_ack_error_code TO mr_error_ws
+	    IF mr_cmnd_ws = SPACES THEN GO TO a10_data_cleanup END-IF		%^ If no routing command, skip msgrout call
+
+	  WHEN (data_msg in isi2_msg_type) or (request_msg in isi2_msg_type)
+
+* Not a response message: this is a data message or a request message or a reply message
+	    MOVE SPACES to mr_cmnd_ws
+	    PERFORM B60_parse_source_block THRU B60_parse_source_block_end
+	    PERFORM B70_parse_auth_status THRU B70_parse_auth_status_end
+	    PERFORM B80_parse_mrn THRU B80_parse_mrn_end
+	    PERFORM B86_parse_prm THRU B86_parse_prm_end
+	    PERFORM B87_parse_rprflags THRU B87_parse_rprflags_end
+	    PERFORM x40_rcv_mirlog THRU x40_rcv_mirlog_end			%^ Make MIR log
+	    PERFORM B85_parse_aur THRU B85_parse_aur_end			%^ #99602
+
+* Default routing code from RMT may be overridden if this is a direct internal route
+	    EVALUATE TRUE
+
+	      WHEN On_us in Msg_direction_wf
+
+		IF mr_cmnd_ws = SPACES
+		   MOVE on_us_mr_cmnd to mr_cmnd_ws
+		END-IF
+		MOVE "TRAP" TO mr_error_ws					%^ Don't allow missing entry if direct on-us route
+
+	      WHEN OTHER
+
+		IF mr_cmnd_ws = SPACES
+		   MOVE mr_cmnd_msg_code to mr_cmnd_ws
+		END-IF
+		MOVE mr_error_code TO mr_error_ws
+
+	    END-EVALUATE
+
+* Treat as outbound or inbound based on the SWIFT header parsed above and client/server orientation
+* Inbound message (SWIFT output header): call message routing with configured commands, in either main history (if
+* SWIFT output header) or sub-history (if SWIFT input header)
+	    IF Outbound in Msg_direction_wf					%^ If outbound message (SWIFT input hdr)
+	      PERFORM b50_outbound_dest THRU b50_outbound_dest_end		%^ Message history now connected to sub-hist
+	    END-IF
+
+	  WHEN OTHER
+* This must be a response for which we could not find the original: bust it
+	    MOVE "EXC" to mr_cmnd_ws
+	    MOVE "TRAP" TO mr_error_ws
+
+	END-EVALUATE.
+
+* Queue message via MESSAGE_ROUTING, in sub-history if outbound, else in main history
+* If the source has not yet been populated, default it to the RMT value, but only if this is a newly allocated message
+	IF (Src_code of Ent_ftr_set = SPACES)
+	  AND (NOT Acked_msg in orig_msg_wf)
+	  %BEG Ent_ftr_set.Src_code = Rmt_union.Source_id; %END
+	END-If.
+
+	CALL "MESSAGE_ROUTING" USING
+	  BY VALUE 7
+	  BY CONTENT mr_func_id_code
+	  BY CONTENT mr_cmnd_ws
+	  BY CONTENT mr_error_ws
+	  BY CONTENT opr_login_id OF menu_opr_union
+	  BY CONTENT api_vstr80_length
+	  BY CONTENT api_vstr80
+	  RETURNING ReturnStatus.
+
+* If no routing entry was found, and the trap-level allowed a return from the call, then
+* call SCAN_DISPOSE if this is an outbound (input to SWIFT) direction message
+ 	IF (Outbound in Msg_direction_wf) AND (Failure_is in ReturnStatus)
+	  %BEG
+	  BREAK: Ent_msg_history;
+	  Ent_msg_union.Msg_history CONN: Ent_msg_history;		%^ Revert to top history for SCAN_DISPOSE in
+	  %END								%^ case connection was within sub-history
+	  MOVE SPACES TO vstr80
+	  MOVE 0 TO rsts
+	  CALL "SCAN_DISPOSE" USING
+			BY VALUE 9
+			BY CONTENT "ISI"		%^ Current function
+			BY CONTENT " "			%^ CDT_IDTYPE
+			BY CONTENT "$$$CBT"		%^ Person-ID
+			BY CONTENT dest_que_name_ws	%^ Dest-qname - out
+			BY CONTENT " "		        %^ Memo
+			BY CONTENT zero          	%^ Memo length
+			BY CONTENT " "			%^ Do amount ndx
+			BY REFERENCE rsts		%^ # subhistories processed
+	END-IF.
+
+* Make a separate message routing call to send the message somewhere in addition to the delivery queue that
+* resulted from the message routing call or dispose call above. This will typically be used to queue a
+* notification of receipt of the message to a link.
+
+	CALL "MESSAGE_ROUTING" USING
+	  BY VALUE 7
+	  BY CONTENT mr_func_id_code
+	  BY CONTENT "ACK"
+	  BY CONTENT "EXIT"
+	  BY CONTENT opr_login_id OF menu_opr_union
+	  BY CONTENT api_vstr80_length
+	  BY CONTENT api_vstr80
+	  RETURNING ReturnStatus.
+
+
+a10_data_cleanup.
+
+	%BEG														%^ #122666
+	BREAK: Tmp_msg_history;
+	%END.
+
+* Disconnect message
+	CALL "DAT_BREAK_MSG".
+
+* Flag no protocol error in current message.
+	MOVE 0 TO rcvbuf_memo_len_ls.
+
+a10_data_end.
+	EXIT.
+
+a20_ctl.
+* Incoming application control message.
+* OUTPUT: RCVBUF_MEMO_LS, _LEN_LS set if protocol error.
+
+* Case on role
+	IF (role_flag = "S")
+	  PERFORM b10_src_ctl THRU b10_src_ctl_end
+	ELSE
+	  PERFORM b20_tgt_ctl THRU b20_tgt_ctl_end
+	END-IF.
+a20_ctl_end.
+	EXIT.
+
+b10_src_ctl.
+* CUST msg rcvd at source.  Case on message type.
+	EVALUATE txt of rcv_text_seq(1:3)
+
+	  WHEN "EOD"
+* EOD message: error if not expecting one.
+	    IF (NOT(st_eod_rsp_pnd IN api_mstate))
+	      MOVE eod_mst_err TO rcvbuf_memo_ls(1:%SIZ(eod_mst_err))
+	      MOVE %SIZ(eod_mst_err) TO rcvbuf_memo_len_ls
+	      GO TO b10_src_ctl_end
+	    END-IF
+* Set metastate = EOD.  Should log/commit for recoverabililty.
+	    SET st_eod IN api_mstate TO TRUE
+* Bring line down.
+	    SET evt_cmd_down IN lnk_event TO TRUE
+	    CALL "ISI2_LNK_SUBS"
+
+	  WHEN "SOD"
+* SOD message: error if not expecting one.
+	    IF (NOT(st_sod_rsp_pnd IN api_mstate))
+	      MOVE sod_mst_err TO rcvbuf_memo_ls(1:%SIZ(sod_mst_err))
+	      MOVE %SIZ(sod_mst_err) TO rcvbuf_memo_len_ls
+	      GO TO b10_src_ctl_end
+	    END-IF
+* Received SOD response: set metastate=normal (should log/commit for recoverability)
+	    SET st_nml IN api_mstate TO TRUE
+* Unhold link
+	    SET evt_cmd_nohold IN cmd_event TO TRUE
+	    CALL "ISI2_CMD_SUBS"
+
+	  WHEN OTHER
+	    MOVE unk_msg TO rcvbuf_memo_ls(1:%SIZ(unk_msg))
+	    MOVE %SIZ(unk_msg) TO rcvbuf_memo_len_ls
+	    GO TO b10_src_ctl_end
+
+	END-EVALUATE.
+b10_src_ctl_end.
+	EXIT.
+
+b20_tgt_ctl.
+* CUST msg rcvd at target.  Case on message.
+	EVALUATE txt of rcv_text_seq(1:3)
+
+	  WHEN "EOD"
+* EOD message request.  Error if not expecting one.
+	    IF (NOT(st_nml IN api_mstate))
+	      MOVE eod_mst_err TO rcvbuf_memo_ls(1:%SIZ(eod_mst_err))
+	      MOVE %SIZ(eod_mst_err) TO rcvbuf_memo_len_ls
+	      GO TO b20_tgt_ctl_end
+	    END-IF
+* Set mstate=EOD-RSP-PND (should log/commit for recoverability).
+	    SET st_eod IN api_mstate TO TRUE
+* Issue EOD response.
+	    %BEG
+	    ALLOC_TEMP: api_ctl_out_seq;
+	    api_cmp ^OUT(api_ctl_out_seq)
+	      "EOD rsp msg: last rcvd = ", last_rcvd, ".", cr_lf_rec, /, ^ALLOC_ELEM,
+	      "EOD rsp msg line 2.", cr_lf_rec, /, ^ALLOC_ELEM,
+	      "EOD rsp msg line 3.", cr_lf_rec, /, ^ALLOC_ELEM;
+	    %END
+	    SET evt_fmt_apl_rsp IN fmt_event TO TRUE
+	    CALL "ISI2_FMT_SUBS"
+
+	  WHEN "SOD"
+* SOD message request.  Error if not expecting one.
+	    IF (NOT(st_eod IN api_mstate))
+	      MOVE sod_mst_err TO rcvbuf_memo_ls(1:%SIZ(sod_mst_err))
+	      MOVE %SIZ(sod_mst_err) TO rcvbuf_memo_len_ls
+	      GO TO b20_tgt_ctl_end
+	    END-IF
+* Set mstate=NORMAL (should log/commit for recoverability).
+	    SET st_nml IN api_mstate TO TRUE
+* Issue SOD response
+	    %BEG
+	    ALLOC_TEMP: api_ctl_out_seq;
+	    api_cmp ^OUT(api_ctl_out_seq)
+	      "SOD rsp msg: last rcvd = ", last_rcvd, ".", cr_lf_rec, /, ^ALLOC_ELEM,
+	      "SOD rsp msg line 2.", cr_lf_rec, /, ^ALLOC_ELEM,
+	      "SOD rsp msg line 3.", cr_lf_rec, /, ^ALLOC_ELEM;
+	    %END
+	    SET evt_fmt_apl_rsp IN fmt_event TO TRUE
+	    CALL "ISI2_FMT_SUBS"
+
+	  WHEN OTHER
+	    MOVE unk_msg TO rcvbuf_memo_ls(1:%SIZ(unk_msg))
+	    MOVE %SIZ(unk_msg) TO rcvbuf_memo_len_ls
+	    GO TO b20_tgt_ctl_end
+
+	END-EVALUATE.
+
+b20_tgt_ctl_end.
+	EXIT.
+
+
+* Get 4-character LT abbreviation. This is fetched as the first entry in SWF2_LT_TABLE, and if the
+* table is not found, it is generated from the BIC in the bank union. If that is blank, then it is
+* formed from the 3-character MTS bank acronymn, with "A" appended
+
+B30_get_lt_abbrev.
+
+* Look for a CFG table
+	%beg
+	Isi2cfg_union_key_ws(
+	  .idname = "SWIFT_TELEX_TABLES",
+	  .idprod = "MTS",
+	  .idbank = null,
+	  .idloc = null,
+	  .idcust = null);
+	Isi2cfg_item_key_ws = "SWF2_LT_TABLE:";
+	Isi2cfg_match_key_ws = null;
+	Isi2cfg_item_type_ws = "STR(16)";
+	%end.
+	CALL "CFG_MATCH_ITEM" USING
+			by reference Idname of Isi2cfg_union_key_ws
+			by reference Idprod of Isi2cfg_union_key_ws
+			by reference Idbank of Isi2cfg_union_key_ws
+			by reference Idloc of Isi2cfg_union_key_ws
+			by reference Idcust of Isi2cfg_union_key_ws
+			by reference Isi2cfg_item_key_ws
+			by reference Isi2cfg_match_key_ws
+			by reference Isi2cfg_match_key_ws_length
+			by reference Isi2cfg_seq_ordinal_ws
+			by reference Isi2cfg_error_msg_ws
+			by reference Isi2cfg_error_msg_ws_length
+			returning ReturnStatus.
+
+* Get 1st table entry if table was found
+	IF Success_is IN ReturnStatus
+	  CALL "CFG_GET_ITEM" USING
+			by reference Idname of Isi2cfg_union_key_ws
+			by reference Idprod of Isi2cfg_union_key_ws
+			by reference Idbank of Isi2cfg_union_key_ws
+			by reference Idloc of Isi2cfg_union_key_ws
+			by reference Idcust of Isi2cfg_union_key_ws
+			by reference Isi2cfg_item_key_ws
+			by reference Isi2cfg_seq_ordinal_ws
+			by reference Isi2cfg_item_type_ws
+			by reference Tmp_vstr
+			by reference Tmp_vstr_length
+			by reference Isi2cfg_error_msg_ws
+			by reference Isi2cfg_error_msg_ws_length
+			returning ReturnStatus
+	  IF (Success_is IN ReturnStatus) AND (Tmp_vstr_length > 15)
+	    MOVE Tmp_vstr (13:4) TO Isi2_lt_abbr
+	    GO TO B30_get_lt_abbrev_cleanup
+	  END-IF
+	END-IF.
+
+* If no table, or no table entry match, use the BIC from the bank union
+	IF Swift_id of Menu_bnk_union NOT = SPACES
+	  MOVE Swift_id of Menu_bnk_union (1:3) TO Isi2_lt_abbr (1:3)
+	  MOVE "A" TO Isi2_lt_abbr(4:1)
+	  GO TO B30_get_lt_abbrev_cleanup
+	END-IF.
+
+* Last chance default: bank acronym plus "A"
+	MOVE Bnk_id of Menu_bnk_union TO Isi2_lt_abbr (1:3).
+	MOVE "A" TO Isi2_lt_abbr(4:1).
+
+B30_get_lt_abbrev_cleanup.
+* Common exit path - trace LT abbreviation.
+	call "NEX_LNK_TRACE_DATA" using
+	  by value trace_ctx_blk of trace_ctx_rec,
+	  by content z"LT abbreviation",
+	  by value %siz(isi2_lt_abbr),
+	  by reference isi2_lt_abbr,
+	  by value trace_asc.
+
+B30_get_lt_abbrev_end.
+	EXIT.
+
+B40_init_logs_and_params.
+
+* Find optional SWF2 (MIR) rcv/send logs and sender BIC index
+* This is done only if in client mode, in which case this module is the gateway to
+* SWIFT (via a front-end CBT).
+* The log & index name lengths are set to 0 if the logs are not present, to disable logging.
+
+	IF client_mode in prm_client_server_mode
+	  MOVE Isi2_lt_abbr (1:4) TO Fin_rcv_swf2log_name (1:4), Fin_snd_swf2log_name (1:4), Fin_nak_swf2log_name (1:4)
+	  MOVE 10 TO Fin_rcv_swf2log_name_length, Fin_snd_swf2log_name_length, Fin_nak_swf2log_name_length
+	  MOVE "_F_RCV" TO Fin_rcv_swf2log_name (5:6)
+	  MOVE "_F_SND" TO Fin_snd_swf2log_name (5:6)
+	  MOVE "_F_NAK" TO Fin_nak_swf2log_name (5:6)
+	  %BEG
+	  qrt_key_rec (.Idprod = null,
+			.Idbank = menu_bnk_union.bnk_id,
+			.Idloc = null,
+			.Idcust = null );
+	  qrt_key_rec.idname = Fin_rcv_swf2log_name;
+	  SEARCH: que_root_index(KEY=qrt_key_rec, CONN: fin_rcv_swf2log);
+	  %END
+	  IF (failure_is IN que_root_index_status)
+	    MOVE 0 TO fin_rcv_swf2log_name_length
+	  END-IF
+	  %BEG
+	  qrt_key_rec.idname = Fin_snd_swf2log_name;
+	  SEARCH: que_root_index(KEY=qrt_key_rec, CONN: fin_snd_swf2log);
+	  %END
+	  IF (failure_is IN que_root_index_status)
+	    MOVE 0 TO fin_snd_swf2log_name_length
+	  END-IF
+	  %BEG
+	  qrt_key_rec.idname = Fin_nak_swf2log_name;
+	  SEARCH: que_root_index(KEY=qrt_key_rec, CONN: Fin_nak_swf2log);
+	  %END
+	  IF (failure_is IN que_root_index_status)
+	    MOVE 0 TO Fin_nak_swf2log_name_length
+	  END-IF
+
+* SWF_DST_NDX
+	  %beg
+	  swf_dst_ndx_name = "SWF_DST_NDX";
+	  qrt_key_rec.idname = swf_dst_ndx_name;
+	  search: que_root_index(key = qrt_key_rec, conn: swf_dst_ndx);
+	  %end
+	  if (failure_is in que_root_index_status)
+	    move 0 to swf_dst_ndx_name_length
+	  end-if
+
+	END-IF.
+
+	%BEG
+	SEARCH: rmt_parameter_seq(Key = "PRM PREFIX");
+	tmp_prs ^IN(Rmt_parameter_seq.Parameter_value), Prm_prefix_vstr, /;
+	%END.
+	IF Failure_is in Tmp_prs_status
+	  MOVE 0 TO Prm_prefix_vstr_length
+	END-IF.
+
+	%BEG SEARCH: rmt_parameter_seq(Key = "RPRFLAGS"); %END
+	IF Parameter_value of Rmt_parameter_seq = "T"
+	  THEN SET Success_is IN Rprflags_update_allowed to TRUE
+	  ELSE SET Failure_is IN Rprflags_update_allowed to TRUE
+	END-IF.
+
+B40_init_logs_and_params_end.
+	EXIT.
+
+B50_OUTBOUND_DEST.
+
+* Allocate a new subhistory. Return with ENT_MSG_HISTORY connected to
+* the subhistory, and ENT_MSG_SUBHIST not connected.
+* Output:
+*	MR_CMND_WS may contain an override message routing command
+
+	MOVE spaces to Wire_svc, lcl_dest_id_ws.
+	ADD 1 TO Dest_count OF Ent_ftr_set.
+	%beg
+	Ent_ftr_set.Dest_count CHANGE;
+	ALLOC_END: Ent_msg_history (.Qname  (	.Idname  = "*SUB_HISTORY",
+						.Idbank = Ent_ftr_set.loc_info.bank,
+						.Idloc  = Null),
+				    .QTYPE="OBJTYP$_MSG_HISTORY_SEQ",
+				    .MEMO="",
+
+				    ALLOC: Ent_msg_subhist (MOD));
+
+	ALLOC_END: Ent_Dst_Seq(
+		ALLOC: Ent_Dst_Set(MOD));
+	ALLOC_END: Ent_msg_subhist (.Qname  (	.Idname  = "*DST",
+						.Idbank = Ent_ftr_set.loc_info.bank,
+						.Idloc  = Null),
+				    .qtype="OBJTYP$_DST_SET",
+				    POINT: Ent_dst_set(MOD));
+
+%^	BREAK: Ent_msg_subhist;
+
+	Ent_msg_subhist(NOMOD);
+
+	Ent_dst_set.Dst_ordinal = Ent_ftr_set.Dest_count;	%^ Destination #
+
+%^ Leave message history connected in new subhist
+
+	BREAK: Ent_msg_history;
+	Ent_msg_subhist EQUATE: Ent_msg_history ^END;
+	BREAK: Ent_msg_subhist;
+	%END.
+
+	SET Failure_is in Routing_error_wf to True.
+
+* If the message has no SWIFT header, attempt to parse non-SWIFT routing syntax
+	IF Lcl_mir_length = 0
+	  %BEG FIRST: Ent_text_seq; %END		%^ Look back at first line of message
+	  IF Txt of Ent_text_seq (1:1) = "X"		%^ Non-SWIFT telex routing header syntax
+	    PERFORM B58_CUSTOM_TLX_HDR THRU B58_CUSTOM_TLX_HDR_END
+	  END-IF
+	END-If.
+
+	IF S_block_ws_length > 0
+* Found the S block: parse for routing details
+	  PERFORM B55_PARSE_ROUTING thru B55_PARSE_ROUTING_END
+	END-IF.
+
+* Set the test indicator, in case this goes telex, unless a "TEST:" override was found in the S block
+	IF (Dst_out_test_flag of Ent_dst_set = SPACES)
+          IF ((Incoming_msgtype of Ent_ftr_set(1:1) = "1" OR "2" OR "4" OR "5" OR "7" OR "8")
+            OR (Incoming_msgtype of Ent_ftr_set(1:2) = "64" OR "69")
+            OR (Incoming_msgtype of Ent_ftr_set(1:3) = "304" OR "604"))
+	      %BEG Ent_dst_set.Dst_out_test_flag = "Y"; %END
+	  END-IF
+	END-IF.
+
+	IF Success_is in Routing_error_wf
+* If error detected while parsing routing in S block, make memo and force to WRP
+	  %BEG
+	  ALLOC_END: ent_msg_history (
+				.qname(
+					.idbank  = Link_bnk_id,
+					.idloc   = NULL,
+					.idname  = "*SYS_MEMO"),
+				.qtype = "OBJTYP$_NULL",
+				.memo  = Proerr_vstr);
+	  %END
+	  MOVE "WRP" TO mr_cmnd_ws
+	END-IF.
+
+* Try to look up the destination ID REL record
+	%BEG  tmp_prs ^IN(swift_tid_ws), ^NUMBER, ^SPACE, /; %END.
+	Evaluate TRUE
+	  WHEN Success_is in tmp_prs_status
+* Numeric BIC implies telex number - force message to go telex
+	    MOVE "T" TO dest_idtype_ws
+	    MOVE "WIR" TO wire_svc			%^ Select non-SWIFT routing
+	    %BEG
+	    Tmp_cmp ^OUT(lcl_dest_id_ws),  Swift_tid_ws, /,
+		    ^OUT(Ent_dst_set.Dst_dial),  lcl_dest_id_ws, /;
+	    %END
+
+* "/" or "-" in column 2 of SWIFT ID is a form that allows a REL idtype/id to be specified as the destination
+	  WHEN swift_tid_ws (2:1) = "/" or "-"
+	    %BEG Tmp_prs ^IN(swift_tid_ws), dest_idtype_ws, ^ONEOF("/", "-"), lcl_dest_id_ws, /; %END
+	    MOVE "WIR" TO wire_svc			%^ Select non-telex routing method
+	    IF Failure_is in Tmp_prs_status
+	      MOVE SPACES TO dest_idtype_ws, lcl_dest_id_ws
+	    END-IF
+
+* BIC of all "X"'s is just a placeholder in the header, not a destination ID - discard it, and message
+* will be routed to WRP unless routing was carried in the "S" block
+
+	  WHEN swift_tid_ws (1:8) NOT = "XXXXXXXX" AND SPACES
+* Non-numeric implies SWIFT address
+	    MOVE "S" TO dest_idtype_ws
+	    MOVE swift_bic_ws TO lcl_dest_id_ws
+	    MOVE "SWF" TO wire_svc
+
+	  WHEN OTHER
+
+* Do a REL lookup using the key from the "S" block or overlaid on the BIC destination, if specified
+	    EVALUATE TRUE
+		WHEN Dst_dial of Ent_dst_set NOT = SPACES
+		  MOVE "T" TO dest_idtype_ws
+		  MOVE Dst_dial of Ent_dst_set TO lcl_dest_id_ws
+		  MOVE "TLX" TO wire_svc
+
+		WHEN dst_ans of Ent_dst_set NOT = SPACES
+		  MOVE "X" TO dest_idtype_ws
+		  MOVE dst_ans of Ent_dst_set TO lcl_dest_id_ws
+		  MOVE "TLX" TO wire_svc
+
+		WHEN dst_mac of Ent_dst_set NOT = SPACES
+		  MOVE "M" TO dest_idtype_ws
+		  MOVE dst_mac of Ent_dst_set TO lcl_dest_id_ws
+		  MOVE "MAC" TO wire_svc
+
+		WHEN dst_idtype of dst_typ of Ent_dst_set NOT = SPACES
+		  MOVE dst_idtype of dst_typ of Ent_dst_set TO dest_idtype_ws
+		  MOVE dst_id of dst_typ of Ent_dst_set TO lcl_dest_id_ws
+		  MOVE "WIR" TO wire_svc
+
+		WHEN OTHER
+		  MOVE SPACES TO dest_idtype_ws, lcl_dest_id_ws
+	    END-EVALUATE
+
+	END-EVALUATE.
+
+	IF dest_idtype_ws NOT = SPACE
+	  MOVE "F" TO acct_look_pend_del
+	  CALL "ACCT_LOOKUP" USING BY REFERENCE dest_idtype_ws
+				BY REFERENCE lcl_dest_id_ws
+				BY REFERENCE dest_ovr_ws
+				BY REFERENCE suppress_ambig_flag
+				BY REFERENCE search_banks_flag
+				BY REFERENCE search_currency
+				BY REFERENCE acct_look_pend_del
+				RETURNING ReturnStatus
+	ELSE
+	  Set Failure_is in ReturnStatus to True
+	END-IF.
+
+
+	Evaluate TRUE
+
+	  WHEN (Success_is in ReturnStatus) AND (dest_ovr_ws = SPACE)
+* On-file: select a transmission method, letting the override method from the "S" block or implied by a numeric BIC
+* take precedence
+	    CALL "WIRE_ADR" USING
+		BY REFERENCE wire_svc
+		BY REFERENCE blank_carrier
+		BY REFERENCE zero_ws
+		RETURNING ReturnStatus
+
+	  WHEN (dest_idtype_ws = "S")
+		AND (swift_bic_ws NOT = SPACES)
+
+* Not-on-file SWIFT BIC: send to the SWIFT destination
+	    %BEG
+	    Ent_dst_set.Dst_type = "SWF";
+	    Ent_dst_set.Dst_route_id = swift_bic_ws;
+        Ent_dst_set.Dst_typ.Dst_ovr = "*";                          %^ #119513
+        Ent_dst_set.Dst_typ.Dst_idtype = dest_idtype_ws;            %^ #119513
+        Ent_dst_set.Dst_typ.Dst_id = swift_bic_ws;                  %^ #119513
+        %END
+
+	  WHEN OTHER
+
+* Not-on-file telex destination, or routing not parsed from header: route with WRP command, with telex number if parsed from
+* header
+	    IF Wire_svc = "WIR" THEN MOVE "TLX" TO Wire_svc END-IF		%^ "WIR" is a generic code to WIRE_ADR call
+	    IF Wire_svc NOT = SPACES
+	      %BEG Ent_dst_set.Dst_type = Wire_svc; %END
+	    END-IF
+	    MOVE "WRP" TO mr_cmnd_ws
+
+	END-EVALUATE.
+
+B50_OUTBOUND_DEST_END.
+	EXIT.
+
+B55_PARSE_ROUTING.
+
+* Input:
+*	S_BLOCK_WS contains the S-block trailer string
+*	1. Parse for "TEST:Y/N", and populate test required flag for outgoing delivery of the message
+*	2. Parse for various routing options:
+*		TLX, ANS, MAC, MAI, FAX
+*		DST_TYPE is set to TLX > MAC > MAI > FAX (i.e. this is the order of precedence when there are multiple keys)
+
+* Parse test flag if present
+	%BEG
+	Tmp_prs ^IN (S_block_ws), ^STRING, "{", "TEST:" Tmp_vstr, "}";
+	%End.
+	IF Success_is in Tmp_prs_status THEN
+        IF (Tmp_vstr_length > 1) or (Tmp_vstr(1:1) NOT = "Y" AND "N")  %^#122707
+            Set Success_is in Routing_error_wf to True
+		IF Proerr_vstr_length = 0
+		  %BEG Proerr_vstr = "Syntax error in TEST sub-block - must be Y or N"; %END
+		END-IF
+	        GO TO B55_PARSE_ROUTING_END
+	    END-IF
+	    %BEG Ent_dst_set.Dst_out_test_flag = Tmp_vstr; %END
+	END-IF.
+
+* Parse routing data if found
+	%BEG
+	Tmp_prs ^IN (S_block_ws), ^STRING,
+		Tmp_oneof (^ONEOF (
+			("{", "TLX:" |Tmp_big_vstr, "}")
+			("{", "ANS:" |Tmp_big_vstr, "}")
+			("{", "MAC:" |Tmp_big_vstr, "}")
+			("{", "MAI:" |Tmp_big_vstr, "}")
+			("{", "FAX:" |Tmp_big_vstr, "}")
+			("{", "SNAM:" |Tmp_big_vstr, "}")
+			("{", "CNAM:" |Tmp_big_vstr, "}")
+			("{", "INAM:" |Tmp_big_vstr, "}") ) );
+	%END.
+
+	IF Failure_is in Tmp_prs_status THEN
+	  GO TO B55_PARSE_ROUTING_END
+	END-IF.
+
+* Parse the routing information just extracted
+	EVALUATE Tmp_oneof
+
+	  WHEN 0					%^ TLX - telex number
+	    IF Tmp_big_vstr_length > %SIZ(Ent_dst_set.Dst_dial)
+		Set Success_is in Routing_error_wf to True
+		IF Proerr_vstr_length = 0
+		  %BEG Proerr_vstr = "Telex number truncated"; %END
+		END-IF
+		MOVE %SIZ(Ent_dst_set.Dst_dial) TO Tmp_big_vstr_length
+	    END-IF
+	    IF Dst_dial of Ent_dst_set NOT = SPACES
+	      Set Success_is in Routing_error_wf to True
+	      IF Proerr_vstr_length = 0
+		  %BEG Proerr_vstr = "Multiple dial numbers specified"; %END
+	      END-IF
+	      GO TO B55_PARSE_ROUTING_END
+	    END-IF
+	    %BEG Ent_dst_set.Dst_dial = Tmp_big_vstr; %END
+	    IF Dst_type of Ent_dst_set NOT = "TLX" THEN %BEG Ent_dst_set.Dst_type = "TLX"; %END END-IF
+
+	  WHEN 1					%^ ANS
+	    IF Tmp_big_vstr_length > %SIZ(Ent_dst_set.Dst_ans)
+		Set Success_is in Routing_error_wf to True
+		IF Proerr_vstr_length = 0
+		  %BEG Proerr_vstr = "Answerback string truncated"; %END
+		END-IF
+		MOVE %SIZ(Ent_dst_set.Dst_ans) TO Tmp_big_vstr_length
+	    END-IF
+	    IF Dst_ans of Ent_dst_set NOT = SPACES
+	      Set Success_is in Routing_error_wf to True
+	      IF Proerr_vstr_length = 0
+		  %BEG Proerr_vstr = "Multiple answerbacks specified"; %END
+	      END-IF
+	      GO TO B55_PARSE_ROUTING_END
+	    END-IF
+	    %BEG Ent_dst_set.Dst_ans = Tmp_big_vstr; %END
+	    IF Dst_type of Ent_dst_set NOT = "TLX" THEN %BEG Ent_dst_set.Dst_type = "TLX"; %END END-IF
+
+	  WHEN 2					%^ MAC
+	    IF Tmp_big_vstr_length > %SIZ(Ent_dst_set.Dst_mac)
+		Set Success_is in Routing_error_wf to True
+		IF Proerr_vstr_length = 0
+		  %BEG Proerr_vstr = "MAC truncated"; %END
+		END-IF
+		MOVE %SIZ(Ent_dst_set.Dst_mac) TO Tmp_big_vstr_length
+	    END-IF
+	    IF Dst_mac of Ent_dst_set NOT = SPACES
+	      Set Success_is in Routing_error_wf to True
+	      IF Proerr_vstr_length = 0
+		  %BEG Proerr_vstr = "Multiple MACs specified"; %END
+	      END-IF
+	      GO TO B55_PARSE_ROUTING_END
+	    END-IF
+	    %BEG Ent_dst_set.Dst_ans = Tmp_big_vstr; %END
+	    IF Dst_type of Ent_dst_set NOT = "TLX" AND "MAC" THEN %BEG Ent_dst_set.Dst_type = "MAC"; %END END-IF
+
+	  WHEN 3					%^ MAI
+	    Multiply 4 BY %SIZ(Ent_dst_set.Dst_name1) GIVING Tmp_long
+	    IF Tmp_big_vstr_length > Tmp_long
+		Set Success_is in Routing_error_wf to True
+		IF Proerr_vstr_length = 0
+		  %BEG Proerr_vstr = "EMAIL string truncated"; %END
+		END-IF
+		MOVE Tmp_long TO Tmp_big_vstr_length
+	    END-IF
+	    IF Dst_name1 of Ent_dst_set NOT = SPACES
+	      Set Success_is in Routing_error_wf to True
+	      IF Proerr_vstr_length = 0
+		  %BEG Proerr_vstr = "Multiple email addresses specified"; %END
+	      END-IF
+	      GO TO B55_PARSE_ROUTING_END
+	    END-IF
+* Pack the email adress in up to 4 CABLE address lines 1-4 (35 byte chunks)
+	    MOVE Tmp_big_vstr_length TO Tmp_long
+	    IF Tmp_long > %SIZ(Ent_dst_set.Dst_name1)
+	      THEN MOVE %SIZ(Ent_dst_set.Dst_name1) TO Tmp_big_vstr_length
+	    END-IF
+	    %BEG Ent_dst_set.Dst_name1 = Tmp_big_vstr; %END
+	    Add 1 TO Tmp_big_vstr_length Giving Tmp_offset
+	    SUBTRACT Tmp_big_vstr_length FROM Tmp_long
+	    IF NOT (Tmp_long > 0)
+	      GO TO B55_PARSE_ROUTING_END
+	    END-IF
+	    MOVE Tmp_big_vstr (Tmp_offset:Tmp_long) TO Tmp_big_vstr (1:Tmp_long)		%^ Shift next over moved text
+	    IF Dst_type of Ent_dst_set NOT = "TLX" AND "MAC" AND "MAI" THEN %BEG Ent_dst_set.Dst_type = "MAI"; %END END-IF
+
+	    IF Tmp_long > %SIZ(Ent_dst_set.Dst_cab2)
+	      THEN MOVE %SIZ(Ent_dst_set.Dst_cab2) TO Tmp_big_vstr_length
+	      ELSE MOVE Tmp_long TO Tmp_big_vstr_length
+	    END-IF
+	    %BEG Ent_dst_set.Dst_cab2 = Tmp_big_vstr; %END
+	    Add 1 TO Tmp_big_vstr_length Giving Tmp_offset
+	    SUBTRACT Tmp_big_vstr_length FROM Tmp_long
+	    IF NOT (Tmp_long > 0)
+	      GO TO B55_PARSE_ROUTING_END
+	    END-IF
+	    MOVE Tmp_big_vstr (Tmp_offset:Tmp_long) TO Tmp_big_vstr (1:Tmp_long)
+
+	    IF Tmp_long > %SIZ(Ent_dst_set.Dst_cab3)
+	      THEN MOVE %SIZ(Ent_dst_set.Dst_cab3) TO Tmp_big_vstr_length
+	      ELSE MOVE Tmp_long TO Tmp_big_vstr_length
+	    END-IF
+	    %BEG Ent_dst_set.Dst_cab3 = Tmp_big_vstr; %END
+	    Add 1 TO Tmp_big_vstr_length Giving Tmp_offset
+	    SUBTRACT Tmp_big_vstr_length FROM Tmp_long
+	    IF NOT (Tmp_long > 0)
+	      GO TO B55_PARSE_ROUTING_END
+	    END-IF
+	    MOVE Tmp_big_vstr (Tmp_offset:Tmp_long) TO Tmp_big_vstr (1:Tmp_long)
+
+	    IF Tmp_long > %SIZ(Ent_dst_set.Dst_cab4)
+	      THEN MOVE %SIZ(Ent_dst_set.Dst_cab4) TO Tmp_big_vstr_length
+	      ELSE MOVE Tmp_long TO Tmp_big_vstr_length
+	    END-IF
+	    %BEG Ent_dst_set.Dst_cab4 = Tmp_big_vstr; %END
+	    Add 1 TO Tmp_big_vstr_length Giving Tmp_offset
+	    SUBTRACT Tmp_big_vstr_length FROM Tmp_long
+	    IF NOT (Tmp_long > 0)
+	      GO TO B55_PARSE_ROUTING_END
+	    END-IF
+	    MOVE Tmp_big_vstr (Tmp_offset:Tmp_long) TO Tmp_big_vstr (1:Tmp_long)
+
+
+	  WHEN 4					%^ FAX
+	    IF Tmp_big_vstr_length > %SIZ(Ent_dst_set.Dst_dial)
+		Set Success_is in Routing_error_wf to True
+		IF Proerr_vstr_length = 0
+		  %BEG Proerr_vstr = "FAX number truncated"; %END
+		END-IF
+		MOVE %SIZ(Ent_dst_set.Dst_dial) TO Tmp_big_vstr_length
+	    END-IF
+	    IF Dst_dial of Ent_dst_set NOT = SPACES
+	      Set Success_is in Routing_error_wf to True
+	      IF Proerr_vstr_length = 0
+		  %BEG Proerr_vstr = "Multiple dial numbers specified"; %END
+	      END-IF
+	      GO TO B55_PARSE_ROUTING_END
+	    END-IF
+	    %BEG Ent_dst_set.Dst_dial = Tmp_big_vstr; %END
+	    IF Dst_type of Ent_dst_set = SPACES THEN %BEG Ent_dst_set.Dst_type = "MAI"; %END END-IF
+
+	  WHEN 5					%^ SNAM, CUS or INAM
+	  WHEN 6
+	  WHEN 7
+	    IF Tmp_big_vstr_length > %SIZ(Ent_dst_set.Dst_typ.Dst_id)
+		MOVE %SIZ(Ent_dst_set.Dst_typ.Dst_id) TO Tmp_big_vstr_length
+	    END-IF
+	    IF Dst_mac of Ent_dst_set NOT = SPACES
+	      Set Success_is in Routing_error_wf to True
+	      IF Proerr_vstr_length = 0
+		%BEG Proerr_vstr = "Multiple SNAM's specified"; %END
+	      END-IF
+	      GO TO B55_PARSE_ROUTING_END
+	    END-IF
+	    EVALUATE Tmp_oneof
+	      WHEN 5 MOVE "N" TO Tmp_vstr (1:1)
+	      WHEN 6 MOVE "U" TO Tmp_vstr (1:1)
+	      WHEN 7 MOVE "I" TO Tmp_vstr (1:1)
+	    END-EVALUATE
+	    MOVE 1 TO Tmp_vstr_length
+	    %BEG
+	    Ent_dst_set.Dst_typ (.Dst_id = Tmp_big_vstr, .Dst_idtype = Tmp_vstr);
+	    %END
+
+	END-EVALUATE.
+
+B55_PARSE_ROUTING_END.
+	EXIT.
+
+B58_CUSTOM_TLX_HDR.
+
+* Parse a custom telex routing header of the form:
+*	"X<telex number>/<answerback>[,<2nd number>/<2nd answerback>]:;"
+* Bail out if any syntax discrepancy
+* If a telex number is found, set the routing type to "TLX"
+
+* Parse the telex number and store in DST_SET
+	%BEG Tmp_prs ^IN(Ent_text_seq.Txt), "X", Tmp_big_vstr, "/"; %END.
+	IF Failure_is in Tmp_prs_status
+	  GO TO B58_CUSTOM_TLX_HDR_END
+	END-IF.
+
+	IF Tmp_big_vstr_length > %SIZ(Ent_dst_set.Dst_dial)
+	  MOVE %SIZ(Ent_dst_set.Dst_dial) TO Tmp_big_vstr_length
+	  IF Proerr_vstr_length = 0
+	    %BEG Proerr_vstr = "Telex number truncated"; %END
+	  END-IF
+	END-IF.
+	%BEG Ent_dst_set.Dst_dial = Tmp_big_vstr; %END.
+
+* Set the routing method to "TLX" unless it already contains a value
+	IF Dst_type of Ent_dst_set NOT = "TLX" THEN %BEG Ent_dst_set.Dst_type = "TLX"; %END END-IF.
+
+* Parse the answerback and store in DST_SET
+	%BEG Tmp_prs Tmp_big_vstr, ^ONEOF(",", ":;"); %END.
+	IF Failure_is in Tmp_prs_status
+	  GO TO B58_CUSTOM_TLX_HDR_END
+	END-IF.
+
+	IF Tmp_big_vstr_length > %SIZ(Ent_dst_set.Dst_ans)
+	  MOVE %SIZ(Ent_dst_set.Dst_ans) TO Tmp_big_vstr_length
+	  IF Proerr_vstr_length = 0
+	    %BEG Proerr_vstr = "Answerback truncated"; %END
+	  END-IF
+	END-IF.
+	IF Tmp_big_vstr_length > %SIZ(Ent_dst_set.Dst_ans)
+	  MOVE %SIZ(Ent_dst_set.Dst_ans) TO Tmp_big_vstr_length
+	END-IF.
+	%BEG Ent_dst_set.Dst_ans = Tmp_big_vstr; %END.
+
+B58_CUSTOM_TLX_HDR_END.
+	EXIT.
+
+B60_parse_source_block.
+
+* Check the S block contents for a sub-block "{SRC:<source>}". If found, validate it against both the
+* MTS config table, and the RMT parameter for this link instance. If valid, store it as the message source code.
+* If invalid, route the message as fail.
+
+	PERFORM B65_source_override THRU B65_source_override_end.
+	IF Failure_is in Valid_syntax_wf
+* Invalid source, or bad syntax in "{SRC:" sub-block: flag an error
+	  %BEG
+	  ALLOC_END: ent_msg_history (
+				.qname(
+					.idbank  = Link_bnk_id,
+					.idloc   = NULL,
+					.idname  = "*SYS_MEMO"),
+				.qtype = "OBJTYP$_NULL",
+				.memo  = Proerr_vstr);
+	  %END
+*	  MOVE "WRP" TO mr_cmnd_ws
+	  MOVE "EXC" TO mr_cmnd_ws
+	END-IF.
+
+B60_parse_source_block_end.
+	EXIT.
+
+B65_source_override.
+
+* Parse the S:-block text to see if it contains an override value for the message source code.
+* Input:
+*	S_BLOCK_WS contains the S-block trailer string
+*
+*	Parse for "SRC:<source>"
+*	   Source code must be a valid MTS source, and must also appear in the RMT config option
+*	   "OVERRIDE SOURCES" within a comma-separated list. If it fails either of these tests,
+*	   the message is flagged as an edit failure and routed accordingly.
+
+	%BEG
+	Tmp_prs ^IN (S_block_ws), ^STRING, "{", "SRC:";
+	%End.
+	IF Failure_is in Tmp_prs_status
+	  Set Success_is in Valid_syntax_wf to TRUE		%^ If no override, no complaint about syntax
+	  GO TO B65_source_override_end
+	END-IF.
+
+	Set Failure_is in Valid_syntax_wf to TRUE.		%^ Assume failure until proven otherwise
+	%BEG Tmp_prs Tmp_vstr, "}"; %END
+	IF (Failure_is in Tmp_prs_status) OR (Tmp_vstr_length > 3)
+	  %BEG Proerr_vstr = "Syntax error in SRC: sub-block"; %END
+	  GO TO B65_source_override_end
+	END-IF.
+
+* Validate the source code against the list of all source codes
+	%beg
+	Isi2cfg_union_key_ws(
+	  		 .idprod = "MTS",
+	  		 .idbank = null,
+	  		 .idloc  = null,
+	  		 .idcust = null);
+	Isi2cfg_union_key_ws.Idname  = "SOURCE_CODE_TABLES";
+	
+	Isi2cfg_match_key_ws = null;
+	Isi2cfg_item_type_ws = null;
+
+	tmp_cmp ^OUT(Isi2cfg_item_key_ws), "SOURCE_CODES:", /; 
+ 	tmp_cmp ^OUT(Isi2cfg_match_key_ws), Tmp_vstr, /;
+  	Isi2cfg_seq_ordinal_ws       = <1>;
+	%END.
+
+	CALL "CFG_MATCH_ITEM" USING
+			by reference Idname of Isi2cfg_union_key_ws
+			by reference Idprod of Isi2cfg_union_key_ws
+			by reference Idbank of Isi2cfg_union_key_ws
+			by reference Idloc of Isi2cfg_union_key_ws
+			by reference Idcust of Isi2cfg_union_key_ws
+			by reference Isi2cfg_item_key_ws
+			by reference Isi2cfg_match_key_ws
+			by reference Isi2cfg_match_key_ws_length
+			by reference Isi2cfg_seq_ordinal_ws
+			by reference Isi2cfg_error_msg_ws
+			by reference Isi2cfg_error_msg_ws_length
+			returning ReturnStatus.
+
+	IF Failure_is in ReturnStatus
+	  %BEG Proerr_vstr = "Code in SRC: sub-block is not in SOURCE CODES table"; %END
+	  GO TO B65_source_override_end
+	end-if.
+
+* Validate against the RMT parameter "OVERRIDE SOURCES"
+* If first time through, look up the parameter
+	IF Failure_is in Override_sources_wf
+	  %BEG
+	  SEARCH: rmt_parameter_seq(Key = "OVERRIDE SOURCES");
+	  Override_sources_ws = Rmt_parameter_seq.Parameter_value;
+	  %END
+	  Set Success_is in Override_sources_wf to TRUE
+	END-IF.
+
+* Make sure that the specified source is valid as an override on this circuit
+	%BEG Tmp_prs ^IN (Override_sources_ws), ^STRING, Tmp_vstr (^MATCH); %END.
+	IF Success_is in Tmp_prs_status
+	  %BEG Ent_ftr_set.Src_code = Tmp_vstr; %END
+	  Set Success_is in Valid_syntax_wf to TRUE
+	ELSE
+	  IF Tmp_vstr = Source_id of Rmt_union
+	    %BEG Ent_ftr_set.Src_code = Rmt_union.Source_id; %END
+	    Set Success_is in Valid_syntax_wf to TRUE
+	  ELSE
+	    %BEG Proerr_vstr = "Override code in SRC: sub-block is not in RMT OVERRIDE SOURCES list"; %END
+	END-IF.
+
+B65_source_override_end.
+	EXIT.
+
+B70_parse_auth_status.
+
+* Parse authentication status from S-block
+	%BEG
+	Tmp_prs ^IN (S_block_ws), ^STRING, "{", "SA",
+			Tmp_oneof (^ONEOF ("C", "F", "O", "B", "I")), "}";
+	%End.
+	IF Failure_is in Tmp_prs_status
+	  GO TO B70_parse_auth_status_end
+	END-IF.
+
+	Evaluate Tmp_oneof
+	  WHEN 0 %BEG Ent_ftr_set.Flgs2.Test_state_flg = "P"; %END	%^ {SAC} Authenticated with current key
+	  WHEN 1 %BEG Ent_ftr_set.Flgs2.Test_state_flg = "N"; %END	%^ {SAF} Authenticated with future key
+	  WHEN 2 %BEG Ent_ftr_set.Flgs2.Test_state_flg = "O"; %END	%^ {SAO} Authenticated with old key
+	  WHEN 3 %BEG Ent_ftr_set.Flgs2.Test_state_flg = "B"; %END	%^ {SAB} Authentication bypassed
+	  WHEN 4 %BEG Ent_ftr_set.Flgs2.Test_state_flg = "F"; %END	%^ {SAI} Authentication failed
+	End-evaluate.
+
+B70_parse_auth_status_end.
+	EXIT.
+
+B80_parse_mrn.
+
+* Parse the MRN from the S-block, and if configured insert it as a key in the sender ref index
+	%BEG
+	Tmp_prs ^IN (S_block_ws), ^STRING, "{", "MRN:",
+		Tmp_vstr, "}";
+	%End.
+	IF (Failure_is in Tmp_prs_status)
+	  OR (Tmp_vstr (1:Tmp_vstr_length) = SPACES)
+	  GO TO B80_parse_mrn_end
+	END-IF.
+
+	EVALUATE TRUE
+
+	  WHEN No_ndx in prm_mrn_index
+		%BEG
+		Tmp_cmp ^OUT(vstr80),  "*MRN:", tmp_vstr, /;
+		ALLOC_END: ent_msg_history (mod,
+			.qname(
+				.idbank  = Link_bnk_id,
+				.idloc   = NULL,
+				.idname  = "*SYS_MEMO"),
+			.qtype = "OBJTYP$_NULL",
+			.memo  = vstr80);
+		%END
+		GO TO B80_parse_mrn_end
+
+	  WHEN Sendref_ndx in prm_mrn_index
+		%ace_conn_q /<Link_bnk_id>///<"SENDREFNDX"> to mrn_index with optimization giving ReturnStatus;
+
+	  WHEN Mrn_ndx in prm_mrn_index
+		%BEG Tmp_cmp ^OUT(vstr80), link_name, "_MRN_NDX", /; %END
+		%ace_conn_q /<Link_bnk_id>///<vstr80> to mrn_index with optimization giving ReturnStatus;
+
+	END-EVALUATE.
+
+* If the index was not found, then bail out
+	IF (Failure_is in ReturnStatus)
+	  GO TO B80_parse_mrn_end
+	END-IF.
+
+* Fall through with the right index set up to make the index entry
+	%BEG
+	ALLOC_END: ent_msg_history (
+		  .qname = mrn_index_qid,
+		  .qtype = "QTYP$_GEN_VSTR_INDEX",
+		  .memo = NULL,
+			ALLOC_JOIN: mrn_index (
+			    .vstr_key = tmp_vstr,
+			    .txt = ent_ftr_set.trn_ref) );
+	%END.
+
+B80_parse_mrn_end.
+	EXIT.
+
+
+B85_parse_aur.													%^ #99602
+* Parse the AUR from the S-block, and if present, map it into change_fields of
+* the FTR set.
+
+	%BEG
+	Tmp_prs ^IN( S_block_ws ), ^STRING, "{", "AUR:", Prm_value_ws(^STR<12>), Tmp_vstr(^STR<21>), "}";
+	%End.
+	IF (SUCCESS_is in Tmp_prs_status)
+	THEN
+		%BEG
+		Tmp_cmp ^OUT( Ent_ftr_set.Change_fields ), Tmp_vstr, /;
+		Tmp_cmp ^OUT( Prm_name_ws ) "MTS$AUTOREPREF", /;
+		%END
+
+		%BEG
+		Prm_level_wo Msg_is;
+		Prm_source_wo Isi_is;
+		Prm_edit_wo Text_is;
+		%END
+
+		Initialize Prm_time_on_ws, Prm_time_off_ws
+		Initialize Prm_remaining_ws
+		Set Success_is In Prm_cust_mode_wf To True
+
+		Call "PRULE_MSG_UPDATE_PARAM" using
+				by reference Prm_name_ws,       	%^ vstr(40) PRM name
+				by reference Prm_name_ws_length,    %^ length
+				by reference Prm_level_wo,      	%^ PRULE_LEVEL_ONEOF.DDF
+				by reference Prm_source_wo,     	%^ PRULE_SOURCE_ONEOF.DDF
+				by reference Prm_time_on_ws,    	%^ time
+				by reference Prm_time_off_ws,   	%^ time
+				by reference Prm_edit_wo,       	%^ PR_PARAM_EDIT_ONEOF.DDF
+				by reference Prm_cust_mode_wf,     	%^ boolean
+				by reference Prm_remaining_ws,  	%^ long
+				by reference Prm_value_ws,      	%^ vstr(80) value to store
+				by reference Prm_value_ws_length,   %^ length
+				by reference Prm_present_wf,    	%^ boolean
+				by reference Prm_memo_ws,       	%^ vstr(ACE$_MSG_STR_SIZE)
+				by reference Prm_memo_ws_length 	%^ length
+				returning Prm_status_wf    			%^ boolean
+
+		IF ( Success_is in Prm_status_wf )
+		THEn
+			%BEG
+			ALLOC_END: Ent_msg_history(
+								.Qname( .Idbank = Link_bnk_id,
+										.Idloc = NULL,
+										.Idname= "*SYS_MEMO" ),
+								.Memo = Prm_memo_ws,
+								.Qtype = "OBJTYP$_NULL" );
+			%END
+    End-if
+
+	END-IF.
+B85_parse_aur_end.
+	EXIT.
+
+B86_parse_prm.
+
+* Parse parameters from the S-block. Ignore them unless they match the prefix, or if there is a syntax error.
+* Loop until no more PRM sub-blocks are found, or until a syntax error is encountered in parsing a PRM sub-block
+	%BEG Tmp_prs ^IN (S_block_ws); %END.
+	PERFORM WITH TEST AFTER UNTIL Failure_is in Tmp_prs_status
+	  %BEG Tmp_prs ^STRING, "{", "PRM:", Tmp_vstr, "|", Vstr80, "}"; %End
+	  IF (Failure_is in Tmp_prs_status)
+	    OR (Tmp_vstr (1:Tmp_vstr_length) = SPACES)
+	    OR (Tmp_vstr (1:Prm_prefix_vstr_length) NOT = Prm_prefix_vstr (1:Prm_prefix_vstr_length))
+	    GO TO B86_parse_prm_end
+	  END-IF
+
+* Insert the parameter in the message-level prule area
+	  Set Msg_is in Prm_level_wo TO TRUE				%^ Set to cdt, dbt, or msg by caller.
+	  Set Msg_is in Prm_source_wo TO TRUE
+	  MOVE 0 TO Prm_time_on_ws, Prm_time_off_ws
+	  Set text_is in Prm_edit_wo TO TRUE
+	  MOVE 0 TO Prm_remaining_ws					%^ Single value parameter
+
+	  Call "PRULE_MSG_UPDATE_PARAM" Using
+			By Reference Tmp_vstr,
+			By Reference Tmp_vstr_length,
+			By Reference Prm_level_wo,
+			By Reference Prm_source_wo,
+			By Reference Prm_time_on_ws,
+			By Reference Prm_time_off_ws,
+			By Reference Prm_edit_wo,
+			By Reference Prm_cust_mode_wf,
+			By Reference Prm_remaining_ws,
+			By Reference Vstr80,
+			By Reference Vstr80_length,
+			By Reference Prm_present_wf,
+			By Reference Tmp_big_vstr,			%^ Output: status memo
+			By Reference Tmp_big_vstr_length
+		Returning Prm_status_wf
+	  IF Failure_is in Prm_status_wf
+	    %LIBSTOP "ISI2CBT_RCVBUF$_PRULE_ERROR";
+	  END-IF
+
+
+	END-PERFORM.
+
+
+B86_parse_prm_end.
+	EXIT.
+
+B87_parse_rprflags.
+
+	IF Failure_is in Rprflags_update_allowed
+	  GO TO B87_parse_rprflags_end
+	END-IF.
+
+	%BEG Tmp_prs ^IN (S_block_ws), ^STRING, "{", ^NOSPACE_SKIP, "RPRFLAGS:", Tmp_vstr, "}"; %END.
+	IF (Failure_is in Tmp_prs_status)
+	  OR (Tmp_vstr_length > %SIZ(Ent_ftr_set.Change_fields))
+	  %BEG tmp_prs ^SPACE_SKIP; %END
+	  GO TO B87_parse_rprflags_end
+	END-IF.
+
+* Update non-blank flags in change flag vector by relative offset within the parsed string
+	MOVE 0 TO Tmp_long.
+	PERFORM UNTIL Tmp_long > Tmp_vstr_length
+	  IF Tmp_vstr (Tmp_long : 1) NOT = SPACE
+	    MOVE Tmp_vstr (Tmp_long : 1) TO Change_fields OF Ent_ftr_set (Tmp_long : 1)
+	  END-IF
+	  ADD 1 TO Tmp_long
+	END-PERFORM.
+
+* Output the updated vector
+	%BEG
+	Ent_ftr_set.Change_fields CHANGE;
+	tmp_prs ^SPACE_SKIP;
+	%END.
+
+B87_parse_rprflags_end.
+	EXIT.
+
+B90_PARSE_HDR.
+
+* Parse header lines 1 and 2, and date from block 4 of ACK,
+* then extract the MIR
+* Output: LCL_MIR contains the MIR of the incoming or outgoing message. If
+*	  not found because a SWIFT header format could not be parsed, LCL_MIR_LENGTH is zero
+*	  OUT_HDR_LINE1 contains hdr1
+*
+*	  If outbound message (from MTS to SWIFT, SWIFT "I" header):
+*	    OUR_TID_WS contains our own sending TID (12 characters) from block 1
+*	    SWIFT_TID_WS contains destination TID (12 characters)
+*	    SWIFT_BIC_WS contains 11 character form of destination BIC (minus 9th character of TID)
+*
+*	  If inbound message (from SWIFT to MTS, SWIFT "O" header):
+*	    OUR_TID_WS contains owr own receiving TID from Block 1
+*	    SWIFT_TID_WS contain sender TID from block 2 (if block 2 present)
+*	    SWIFT_BIC_WS contains 11 character form (minus 9th TID character)
+*
+* Side effects:
+*	  If msg is DLVACK, convert to DLVREJ if status and reason code so indicate
+*	  If msg is DLVREJ, parse reason code into LCL_REASON; if no reason code, construct a default reason code
+*	  If header could not be parsed, msg_direction is defaulted from client vs. server mode
+
+	MOVE SPACES to Tmp_yymmdd, Swift_tid_ws.
+	MOVE 0 TO Lcl_reason_length.
+
+* Default message direction if no SWIFT header found:
+	IF client_mode in prm_client_server_mode
+	  Set Inbound in Msg_direction_wf to True
+	ELSE
+	  Set Outbound in Msg_direction_wf to True
+	END-IF.
+
+	%BEG Tmp_prs ^IN (Lcl_msgbuf), ^STRING, "{1:", Out_hdr_line1, "}"; %END.
+	IF Success_is in Tmp_prs_status
+	  %BEG Tmp_prs "{2:", Vstr80, "}"; %END
+	  IF Failure_is in Tmp_prs_status
+	    MOVE SPACE TO Vstr80(1:1)			%^ Neither an "I" nor "O" block 2
+* No block 2: try to parse block 4 of an ACK
+	    %BEG Tmp_prs "{4:{177:", Tmp_yymmdd (^STRING<6>); %END
+	    IF Failure_is in Tmp_prs_status
+	      MOVE SPACES to Tmp_yymmdd
+	    END-IF
+	  END-IF
+	  SET Success_is in Tmp_prs_status TO TRUE	%^ Found a HDR1
+	END-IF.
+
+* If basic SWIFT header not parsed, give up
+	IF Failure_is in Tmp_prs_status
+	  MOVE ZERO TO Lcl_mir_length
+	  MOVE SPACES TO Out_hdr_line1, Our_tid_ws, Swift_tid_ws, Swift_bic_ws
+	  GO TO B90_PARSE_HDR_END
+	END-IF.
+
+* If ACK, see if really a SWIFT NAK and change type if so
+	IF (dlvack in isi2_msg_type)
+	  %BEG Tmp_prs ^STRING, "{451:1}"; %END
+	  IF Success_is in Tmp_prs_status
+	    SET dlvrej in isi2_msg_type to TRUE
+	  END-IF
+	END-IF.
+
+* If SWIFT NAK, parse the reason code
+	IF (dlvrej in isi2_msg_type)
+	  %BEG Tmp_prs ^STRING, "{405:", Lcl_reason, "}"; %END
+	  IF Failure_is in Tmp_prs_status
+	    MOVE "HXX" TO Lcl_reason
+	    MOVE 3 TO Lcl_reason_length
+	  END-IF
+	END-IF.
+
+* Get the SWIFT message type, and remember if this is an inbound or outbound SWIFT header
+* Also extract the SWIFT destination or sender BIC
+* Message direction is relative to MTS; by default, a SWIFT "I" (input) header is outbound from MTS; a SWIFT
+* output header is inbound to MTS; other settings of msg-direction are "on-us" (internally rerouted), and
+* unknown (could not parse the header type). Finally, if the link is in "CLIENT" mode, then an "I" as well
+* as an unknown header are treated as inbound, overriding the default.
+
+	MOVE Out_lt_address of Out_hdr_line1 TO Our_tid_ws.
+
+%^	EVALUATE Io_id of Out_hdr_line2									#109993
+	EVALUATE Vstr80(1:1)
+	  WHEN "I"
+		MOVE Vstr80 (1:Vstr80_length) TO In_fin_hdr_line2 (4:)
+		%BEG
+		Message_type = In_fin_hdr_line2.Msg_type;					%^ #109993
+%^		Ent_ftr_set.Incoming_msgtype = In_fin_hdr_line2.Msg_type;	#109993
+		Msg_direction_wf Outbound;
+		%END
+		MOVE Dest of In_fin_hdr_line2 TO Swift_tid_ws
+
+	  WHEN "O"
+		MOVE Vstr80 (1:Vstr80_length) TO Out_hdr_line2
+		%BEG
+		Message_type = Out_hdr_line2.Msg_type;						%^ #109993
+%^		Ent_ftr_set.Incoming_msgtype = Out_hdr_line2.Msg_type;		#109993
+		Msg_direction_wf Inbound;
+		%END
+		MOVE Mir of Out_hdr_line2 (7:12) TO Swift_tid_ws
+
+	  WHEN OTHER
+		Set Unknown in msg_direction_wf to TRUE
+		MOVE SPACES TO swift_bic_ws, swift_tid_ws, Our_tid_ws
+		MOVE SPACES To Message_type									%^ #109993
+
+	END-EVALUATE.
+
+	IF NOT (Unknown in Msg_direction_wf)
+	  IF swift_tid_ws (10:3) = "XXX" THEN MOVE SPACES TO swift_tid_ws (10:3) END-IF
+	  IF swift_tid_ws (9:1) = "X" THEN MOVE SPACES TO swift_tid_ws (9:1) END-IF
+	  MOVE swift_tid_ws (1:8) to swift_bic_ws (1:8)		%^ Eliminate TID character to form BIC
+	  MOVE swift_tid_ws (10:3) TO swift_bic_ws (9:3)
+	END-IF.
+
+
+	EVALUATE TRUE
+
+	  WHEN dlvack in isi2_msg_type
+	  WHEN dlvrej in isi2_msg_type
+	  WHEN Vstr80 (1:1) NOT = "O"
+
+* Assume this is an ACK of an outbound message; it may also be an inbound message from another
+* system that happens to have a SWIFT "input" header
+* Construct MIR assuming current date
+* Use today's date for the date field in the MIR if not derived from ACK
+	    IF Tmp_yymmdd = SPACES
+	      MOVE 0 TO Tmp_time				%^ Current time
+	      %BEG
+	      Tmp_cmp ^OUT(Tmp_yymmdd),
+					tmp_time.Ye(^number<2>(^leading_zeros)), 
+					tmp_time.Mo(^number<2>(^leading_zeros)),
+					tmp_time.Da(^number<2>(^leading_zeros)), /;
+	      %END
+	    END-IF
+
+* Use out_hdr_line2 as a scratch to build the MIR
+	    %BEG
+	    Out_hdr_line2.Mir (
+			.Msg_date =	Tmp_yymmdd,
+			.In_Adr	=	Out_Hdr_Line1.Out_Lt_Address.Out_Adr,
+			.In_Tid	=	Out_Hdr_Line1.Out_Lt_Address.Out_Tid,
+			.In_Branch_Cd =	Out_Hdr_Line1.Out_Lt_Address.Out_Branch_Cd,
+			.Sender_Session = Out_hdr_line1.Session_num,
+			.Isn	=	Out_hdr_line1.Osn);
+	    %END
+	    MOVE Mir of Out_hdr_line2 TO Lcl_mir
+	    MOVE %SIZ(Lcl_mir) TO Lcl_mir_length
+
+	  WHEN OTHER
+
+* If output header with block 2 present, get the MIR for an inbound
+	    MOVE Mir of Out_hdr_line2 TO Lcl_mir
+	    MOVE %SIZ(Lcl_mir) TO Lcl_mir_length
+
+	END-EVALUATE.
+
+B90_PARSE_HDR_END.
+	Exit.
+
+B100_match_ack.
+
+* The message is a response to a message we sent.
+* If this is an ACK, then the MTS TRN+ordinal is the key to the pending-ack queue
+* Else this is a delivery ack: use the "DLV ACK KEY" config option to decide which key to search for
+
+* 3 ways of getting the pending ACK queue key
+*	1. use the MTS TRN+ordinal, already parsed from message envelope into vCorrelidHex.
+*	   if the message is an ACK (vs. DLVACK), and CorrelID was derived from envelope,
+*	   then use the MQ CorrelID regardless of the DLV ACK KEY setting
+*	2. use the contents of field 108 from the response
+*	3. parse for "{TRN:" in the "{S:" block for field 20
+
+	call "NEX_LNK_TRACE_DATA" using
+	  by value trace_ctx_blk of trace_ctx_rec,
+	  by content z"rcvbuf b100 - isi2_msg_type",
+	  by value %siz(isi2_msg_type),
+	  by reference isi2_msg_type,
+	  by value trace_asc.
+
+* Search either the pending ACK or pending delivery-ACK queue
+	EVALUATE TRUE
+
+	  WHEN ack_msg IN isi2_msg_type
+
+	    %ace_conn_q /<Link_bnk_id>///<prm_pend_ack_qname> to saf_pndq with optimization;
+
+	  WHEN OTHER
+
+	    %ace_conn_q /<Link_bnk_id>///<prm_pend_dlvack_qname> to saf_pndq with optimization;
+
+	END-EVALUATE.
+
+	%BEG
+	END: saf_pndq;
+	%END.
+
+	evaluate isi2_msg_type also prm_dlvack_key
+
+* Protocol ack from MQ (i.e. COA/COD), or delivery ack with format = trn_msg: use Correlation ID, stripping nulls.
+	  when %factor(isi2_msg_type ack_msg) also any
+	  when any also %factor(prm_dlvack_key trn_msgid)
+	    %beg tmp_prs ^in(vCorrelidHex), sCorrelid(^hex); %end
+	    inspect sCorrelid replacing all low-values by " "
+	    %beg saf_pndq.ref_num = sCorrelid; %end
+
+
+* Delivery ack with format 20 (TRN in S-block is echo of field 20)
+	  when any also %factor(prm_dlvack_key fld20)
+	    %BEG tmp_prs ^IN(lcl_msgbuf), ^STRING, "{S:", ^STRING, "{TRN:", saf_pndq.ref_num, "}"; %END
+
+* Delivery ack with format 108.
+* Field 108 typically used if MQSeries is returning first 100 bytes or entire message in the ack,
+* or other application is returning header or entire message.
+	  when any also %factor(prm_dlvack_key fld108)
+	    %BEG tmp_prs ^IN(lcl_msgbuf), ^STRING, "{108:", saf_pndq.ref_num, "}"; %END
+
+	  when other
+	    set failure_is in tmp_prs_status to true
+
+	END-EVALUATE.
+
+* Fall-back if key could not be found in message is to use REF from caller
+	IF Failure_is in tmp_prs_status
+	  %BEG saf_pndq.ref_num = rcv_ref; %END
+	END-IF.
+
+	call "NEX_LNK_TRACE_DATA" using
+	  by value trace_ctx_blk of trace_ctx_rec,
+	  by content z"rcvbuf b100 - saf_pndq.ref_num",
+	  by value ref_num_length of saf_pndq_lengths,
+	  by reference ref_num of saf_pndq,
+	  by value trace_asc.
+
+	%BEG
+	SCAN: saf_pndq  ( EQL, BACKWARD,
+		          scan_key = saf_pndq.ref_num );
+	%END.
+
+	IF Success_is in saf_pndq_status
+	    %BEG
+	    saf_pndq CONN: ent_msg_history (TOP: Ent_msg_union);
+	    DELETE: saf_pndq;
+	    END: ent_msg_history (MOD);
+	    %END
+	    CALL "DAT_CONN_MSG"
+	    SET Acked_msg in orig_msg_wf to True
+	ELSE
+
+* Not found: treat the ACK as an original message by allocating a union, then busting the message
+	    %BEG
+	    tmp_cmp ^OUT(tmp_big_vstr)
+	      "saf_pndq.ref_num = ", saf_pndq.ref_num, 
+	      ", vCorrelidHex=", vCorrelidHex,
+	      ", rcv_ref=", rcv_ref,
+	      ", isi2_msg_hdr.sender_ref=", isi2_msg_hdr.sender_ref, /;
+	    %END
+
+	    CALL "NEX_LNK_TRACE_DATA" using
+              by value trace_ctx_blk of trace_ctx_rec,
+              by content z"match_ack failed:",
+              by value tmp_big_vstr_length,
+              by reference tmp_big_vstr,
+              by value trace_asc
+
+	    SET Unmatched_ack in orig_msg_wf TO True
+	END-IF.
+
+b100_match_ack_end.
+	EXIT.
+
+B200_CHECK_ON_US.
+* Use the SWIFT_QUEUE subroutine in an unconventional way: do a loose search for
+* any entry that indicates that the BIC is "on-us". This is determined by the suffix
+* "_IQ" appearing at the end of the queue name.
+
+* Look up special routing command if this is the first time through
+	IF noinit in reroute_mode_wf
+	  %BEG SEARCH: rmt_parameter_seq(Key = "ON-US ROUTE COMMAND"); %END
+	  IF parameter_value OF rmt_parameter_seq not = SPACES
+	    MOVE Parameter_value of rmt_parameter_seq TO On_us_mr_cmnd
+	    Set direct_route in reroute_mode_wf to TRUE
+	  ELSE
+	    Set internal_reroute in reroute_mode_wf to TRUE
+	  END-IF
+	END-IF.
+
+* If not direct-route mode, don't bother to search for the queue name
+	IF internal_reroute in reroute_mode_wf 
+	  GO TO B200_CHECK_ON_US_END
+	END-IF.
+
+* Find the queue that this message will be disposed to, to see if it is an on-us BIC
+	call "SWIFT_QUEUE" using
+		 by content Bank of Loc_info of Ent_ftr_set	%^ Sending bank
+		 by content Loc of Loc_info of Ent_ftr_set	%^ Sending location
+		 by content Incoming_msgtype of Ent_ftr_set
+		 by reference Swift_bic_ws
+		 by content "2"					%^ Priority
+		 by reference Swf_que_id_ws			%^ Resulting queue name
+		 Returning ReturnStatus.
+	IF Idname of Swf_que_id_ws (10:3) = "_IQ"
+	  Set On_us in Msg_direction_wf TO TRUE
+	END-IF.
+
+B200_CHECK_ON_US_END.
+	EXIT.
+
+B210_io_status_code.
+* In: rcv_iostat
+
+* If the transport layer returned a status code, make a memo to indicate this.
+* Currently, it is taken as a SWIFT-alliance code.
+* %^%^%^TODO This needs to be done in site-specific way in the future for non SWIFT-Alliance
+* transport-specific status codes
+
+* Output: NAN_MSG_WS contains a memo string to write to the message history. If none, length is 0.
+
+	call "NEX_LNK_TRACE_DATA" using
+	  by value trace_ctx_blk of trace_ctx_rec,
+	  by content z"rcvbuf b210 - rcv_iostat",
+	  by value %siz(rcv_iostat),
+	  by reference rcv_iostat,
+	  by value trace_asc.
+
+	MOVE 0 TO Nan_msg_ws_length.
+	IF rcv_iostat = 0
+	    GO TO B210_io_status_code_end
+	END-IF.
+
+* To find documentation for these values, check the MQSA User Guide
+* ("MQSA: MQSeries Interface for SWIFTAlliance User Guide")
+* and search for MQFB_APPL_FIRST.
+	Evaluate rcv_iostat
+
+	  When NEX_RCV_MQFB_PAN
+	  When NEX_RCV_MQFB_NAN
+	    GO TO B210_io_status_code_end
+
+	  When NEX_RCV_MQFB_APPL_1ST + 1
+	    %beg nan_msg_ws = "Message stored in SAA, but failed validation."; %end
+
+	  When NEX_RCV_MQFB_APPL_1ST + 2
+	    %beg nan_msg_ws = "Message stored in SAA, but routing failed in SAA."; %end
+
+	  When NEX_RCV_MQFB_APPL_1ST + 3
+	    %beg nan_msg_ws = "Message could not be stored in SAA and went to dead letter queue instead."; %end
+
+	  When NEX_RCV_MQFB_APPL_1ST + 4
+	    %beg nan_msg_ws = "Message could not be converted to SAA format."; %end
+
+	  When NEX_RCV_MQFB_APPL_1ST + 10
+	    %beg nan_msg_ws = "SAA is still waiting for the SWIFT ack."; %end
+
+	  When NEX_RCV_MQFB_APPL_1ST + 11
+	    %beg nan_msg_ws = "Message timed out."; %end
+
+	  When NEX_RCV_MQFB_APPL_1ST + 12
+	    %beg nan_msg_ws = "Message was rejected."; %end
+
+* Following case (MT019): do not handle as DLVREJ, but process as datagram and let app handle it.
+	  When NEX_RCV_MQFB_APPL_1ST + 13
+	    move 0 to rcv_iostat
+	    go to b210_io_status_code_end
+
+	  When Other
+	    %beg Tmp_cmp ^OUT(Nan_msg_ws),  "Application status: ", rcv_iostat, /; %end
+
+	End-evaluate.
+
+* If we get here, this is one of the Alliance-specific PAN-equivalents: redefine the message type as NAN
+	SET dlvrej in isi2_msg_type TO TRUE.
+	MOVE NEX_RCV_MQFB_NAN TO rcv_iostat.
+
+B210_io_status_code_end.
+	EXIT.
+
+B250_check_dups.
+
+	Set no_dup_osn_found in Src_dup_found_wf to True.
+
+%^  Get the "SRC NO OSN DUPE" parameter from the RMT record
+	If noinit in Src_dup_rmt_wf
+	   %Beg
+	    SEARCH: rmt_parameter_seq(Key = "SRC NO OSN DUPE");
+	   %End
+	   If Success_is in Rmt_parameter_seq_status AND
+	      Parameter_value of Rmt_parameter_seq NOT = Spaces
+	      %Beg
+	       src_parm_value_ws = Rmt_parameter_seq.Parameter_value;	
+	      %End
+		  Set SDC_enabled in Src_dup_rmt_wf to True
+	   Else
+		  Set SDC_disabled in Src_dup_rmt_wf to True
+	   End-if
+	End-if.
+
+	If lnk_sender_ref_format NOT = "OSN" OR
+	   SDC_disabled in Src_dup_rmt_wf
+	   Go To B250_check_dups_end
+	End-if.
+	
+
+	%Beg 
+	 Tmp_prs ^IN (Lcl_msgbuf), ^STRING, "{SRC:", rcv_src_ws(^STRING<3>), "}" ;
+	%End.
+	
+
+%^  No SRC: in the S-Block, exit duplicate checking
+	IF Failure_is in Tmp_prs_status
+	   Go To B250_check_dups_end
+	End-if.
+	
+	%Beg
+	 tmp_prs ^IN(src_parm_value_ws);
+	%End.
+
+	Perform Until (rcv_src_ws = rmt_src_ws) OR
+	               Failure_is in Tmp_prs_status
+	   %Beg
+	    tmp_prs rmt_src_ws, "/" ;
+	   %End
+	End-Perform.
+
+
+%^  The source in the S-block matches the source from RMT parameter so
+%^  check for duplicates    
+	If Success_is in Tmp_prs_status
+	   %Beg
+	    SEARCH: sndrefndx  ( Backward, key = rcv_ref );
+	   %End
+	   If Success_is in sndrefndx_status
+	      Perform B280_log_dup_msg thru B280_log_dup_msg_end
+	      Set dup_osn_found in Src_dup_found_wf to True
+	   End-if
+	End-if.   
+	  
+B250_check_dups_end.
+	EXIT.
+
+B280_log_dup_msg.
+
+    %ace_is dup_osn_log CONNECTED;.
+	If Failure_Is in Ace_status_wf
+	   %ace_conn_q /<Link_bnk_id>///"DUP_OSN_LOG" to dup_osn_log For Insert;
+	End-if.
+
+	%Beg
+	 parse_ws ^IN(rcv_ref), ^STRING<8>, osn_ws (^STRING<6>);
+	 compose_ws ^Out(dup_memo_ws)
+	    "Dup OSN: ", osn_ws, 
+%^	    "Duplicate OSN: ", rcv_ref, 
+	    " found, see TRN ", sndrefndx.txt, /;
+	%End.
+
+	%Beg
+	ALLOC_END: ent_msg_history (
+	  .qname.idname = "DUP_OSN_LOG",
+	  .qtype = "QTYP$_GEN_VSTR_INDEX",
+	  .memo = NULL,
+		ALLOC_JOIN: dup_osn_log (.vstr_key = dup_memo_ws ) );
+	%End.
+
+* Convert received text block into ENT_TEXT_SEQ sequence.
+
+	Perform b300_map_swf_text thru b300_map_swf_text_end.
+
+B280_log_dup_msg_end.
+	EXIT.
+
+b300_map_swf_text.
+* Map SWIFT data from buffer to text sequences.
+* Input:
+*	lcl_msgbuf(_length) = buffered data
+
+	call "NEX_SWF_MAP_DATA" using
+	  by reference lcl_msgbuf,
+	  by value lcl_msgbuf_length,
+	  by reference txt of ent_text_seq,
+	  by reference txt_length of ent_text_seq_lengths,
+	  by reference txt of ent_remittance_txt,
+	  by reference txt_length of ent_remittance_txt_lengths,
+	  by value 0.
+b300_map_swf_text_end.
+	exit.
+
+
+b400_map_nonswf_text.
+* Map non-SWIFT data from buffer to text sequence:
+* output msg broken at <CR><LF> delimiters or 80 bytes
+
+	%BEG tmp_prs ^NOSPACE_SKIP ^IN(Lcl_msgbuf); %END.
+	MOVE 1 TO rsts.
+	PERFORM WITH TEST AFTER UNTIL Tmp_oneof = 0
+	  %BEG
+	  tmp_prs tmp_oneof (^ONEOF (
+		(/,
+		 (| Tmp_memo, <13>,<10>),				%^ Accept <LF>, or <CR><LF>
+		 (| Tmp_memo, <10>),
+		 (| Tmp_memo (^STRING<-1>)))));				%^ else parse what will fit
+	  %END
+	  IF Failure_is in Tmp_prs_status
+	    MOVE 0 TO tmp_oneof, Tmp_memo_length, Rsts
+	  ELSE
+	    Move Tmp_memo (1:Tmp_memo_length) to txt OF Ent_text_seq
+	    Move Tmp_memo_length to Txt_length OF Ent_text_seq_lengths
+	  END-IF
+	  IF Tmp_Memo_length > 0 %BEG ALLOC_ELEM: Ent_text_seq; %END END-IF
+	END-PERFORM.
+
+	%BEG tmp_prs ^SPACE_SKIP; %END					%^ Back to default setting
+
+* If parsing failed, then revert to the last chance message capture scheme: output msg in 80-byte chunks
+	IF rsts = 0
+* Loop to discard what we already stored
+	  %BEG FIRST: Ent_text_seq; %END
+	  PERFORM UNTIL Seq_end_is in Ent_text_seq_cursor
+	    %BEG DELETE_THEN_NEXT: Ent_text_seq; %END
+	  END-PERFORM
+	  Move 1 to Tmp_long
+	  Perform until Lcl_msgbuf_length is zero
+ 	    If Lcl_msgbuf_length < 80
+	      Move lcl_msgbuf(Tmp_long:Lcl_msgbuf_length) to txt OF Ent_text_seq
+	      Move Lcl_msgbuf_length to txt_length OF Ent_text_seq_lengths
+	      Move zero to Lcl_msgbuf_length
+	    else
+	      Move lcl_msgbuf(Tmp_long:80) to txt OF Ent_text_seq
+	      Move 80 to txt_length OF Ent_text_seq_lengths
+	      Subtract 80 from Lcl_msgbuf_length
+	      Add 80 to Tmp_long
+	    End-if
+	    %BEG ALLOC_ELEM: Ent_text_seq; %END
+	  End-Perform
+	END-IF.
+
+b400_map_nonswf_text_end.
+	exit.
+
+
+b500_parse_mqdata.
+* Parse MQ data from TMP_BIG_VSTR.
+*
+* Input:
+*	tmp_big_vstr = <reply-to-queue>||<msg-id-hex>//<correl-id-hex>\\, else null.
+* Output:
+*	vReplyToQueue
+*	vMsgidHex
+*	vCorrelidHex
+
+* Trace input parameter
+	call "NEX_LNK_TRACE_DATA" using
+	  by value trace_ctx_blk of trace_ctx_rec,
+	  by content z"rcvbuf b300 - tmp_big_vstr",
+	  by value tmp_big_vstr_length,
+	  by reference tmp_big_vstr,
+	  by value trace_asc.
+
+	%beg
+	vReplyToQueue = null;
+	vMsgidHex = null;
+	vCorrelidHex = null;
+	%end.
+
+* Parse input data if present
+	if (tmp_big_vstr_length > 0)
+	  %beg tmp_prs ^in(tmp_big_vstr) vReplyToQueue, "||", vMsgidHex, "//", vCorrelidHex, "\\", /; %end
+	end-if.
+
+* Trace output parameters
+	call "NEX_LNK_TRACE_DATA" using
+	  by value trace_ctx_blk of trace_ctx_rec,
+	  by content z"ReplyToQueue",
+	  by value vReplyToQueue_length,
+	  by reference vReplyToQueue,
+	  by value trace_asc.
+	call "NEX_LNK_TRACE_DATA" using
+	  by value trace_ctx_blk of trace_ctx_rec,
+	  by content z"Msgid-hex",
+	  by value vMsgidHex_length,
+	  by reference vMsgidHex,
+	  by value trace_asc.
+	call "NEX_LNK_TRACE_DATA" using
+	  by value trace_ctx_blk of trace_ctx_rec,
+	  by content z"Correlid-hex",
+	  by value vCorrelidHex_length,
+	  by reference vCorrelidHex,
+	  by value trace_asc.
+
+b500_parse_mqdata_end.
+	exit.
+
+
+x10_rcv_log.
+
+* Join message to input line log (LINELOG).
+* INPUT (et.al.):
+*	ENT_MSG_HISTORY = Message connection at insertion point.
+*	RCVBUF_SEQ_LS = Message sequence number.
+*	RCV_REF = Message sender reference.
+*	vReplyToQueue, vMsgidHex, vCorrelidHex = optional I/O layer information to store in msg-history memo
+*	ORIG_MSG_WF indicates if this is a new message
+
+* Transfer sequence number.
+	MOVE rcvbuf_seq_ls TO last_seq OF linelog.
+* Compute next-to-receive
+	IF (rcvbuf_seq_ls = lnk_wrap_seq)
+	  MOVE 1 TO tmp_long
+	ELSE
+	  ADD 1 TO rcvbuf_seq_ls GIVING tmp_long
+	END-IF.
+
+* Memo on log will show type of received message
+	EVALUATE TRUE
+	  WHEN Rcvd_msg IN Orig_msg_wf
+	   MOVE "DATA MSG" TO Vstr80(1:8)
+	   MOVE 8 TO Vstr80_length
+
+* Matched ACK
+	  WHEN Acked_msg IN Orig_msg_wf
+	    IF ack_msg in ISI2_msg_type
+	      MOVE "ACK" TO Vstr80(1:3)
+	      MOVE 3 TO Vstr80_length
+	    ELSE
+	      MOVE "DLV ACK" TO Vstr80(1:7)
+	      MOVE 7 TO Vstr80_length
+	    END-IF
+
+	  WHEN Other
+* Unmatched ACK:
+	    IF ack_msg in ISI2_msg_type
+	      MOVE "BAD ACK" TO Vstr80(1:7)
+	      MOVE 7 TO Vstr80_length
+	    ELSE
+	      MOVE "BAD DLV ACK" TO Vstr80(1:11)
+	      MOVE 11 TO Vstr80_length
+	    END-IF
+
+	END-EVALUATE.
+
+	%BEG
+	ALLOC_END: ent_msg_history (
+	  .qname(
+	    .idbank = link_bnk_id,
+	    .idloc = NULL,
+	    .idname = link_name),
+	  .qtype = "QTYP$_LINE_LOG",
+	  .memo = null,
+		ALLOC_JOIN: linelog(
+		    .systime Now,
+		    .Log_type msg_log,
+		    .next_seq = tmp_long,
+		    .txt = Vstr80,
+		    .memo = rcv_ref ) );
+	%END.
+
+* Insert 2 memos: reply-to-q, msgid-hex
+	%beg
+	tmp_cmp ^out(ent_msg_history.memo), "*LNK_INF_REPLYQ:", vReplyToQueue, /;
+	alloc_elem: ent_msg_history(
+	  .qname(
+	    .idbank = link_bnk_id,
+	    .idloc = null,
+	    .idname = "*SYS_MEMO"),
+	  .qtype = "OBJTYP$_NULL");
+	tmp_cmp ^out(ent_msg_history.memo), "*LNK_INF_MSGID:", vMsgidHex, /;
+	alloc_elem: ent_msg_history(
+	  .qname(
+	    .idbank = link_bnk_id,
+	    .idloc = null,
+	    .idname = "*SYS_MEMO"),
+	  .qtype = "OBJTYP$_NULL");
+	%end.
+
+* Escape if sender ref index not applicable
+	IF (NOT Rcvd_msg in Orig_msg_wf)
+	   OR (dlvack in isi2_msg_type)
+	   OR (dlvrej in isi2_msg_type)
+	   OR  (rcv_ref (1:rcv_ref_length) = SPACES)
+	   OR (dup_osn_found in Src_dup_found_wf)
+	  GO TO x10_rcv_log_end
+	END-IF.
+
+* New inbound message with non-blank sender ref: index message by sender's reference number
+	%BEG
+	sndrefndx(INSERT);
+	ALLOC_END: ent_msg_history (
+	  .qname.idname = sndrefndx_name,
+	  .qtype = "QTYP$_GEN_VSTR_INDEX",
+	  .memo = NULL,
+		ALLOC_JOIN: sndrefndx (.vstr_key = rcv_ref,
+				       .txt = ent_ftr_set.trn_ref ) );
+	sndrefndx(READ_ONLY);
+	%END.
+
+x10_rcv_log_end.
+	EXIT.
+
+x20_sndndx_join.
+
+* Make an index entry using the BIC that sent the message to us through SWIFT if the log is connected
+* Input:
+*	SWIFT_BIC_WS contain the key to index
+
+	IF prm_gen_vstr_ndx_qname_length = 0		%^ If not configured
+	  GO TO x20_sndndx_join_end
+	END-IF.
+
+	%ace_conn_q /<Link_bnk_id>///<prm_gen_vstr_ndx_qname> to api_gen_vstr_ndx with optimization;
+
+
+	MOVE swift_bic_ws TO vstr_key OF api_gen_vstr_ndx(1:11).
+	IF swift_bic_ws (9:3) = "XXX" or SPACES
+	  THEN MOVE 8 TO vstr_key_length OF api_gen_vstr_ndx_lengths
+	  ELSE MOVE 11 TO vstr_key_length OF api_gen_vstr_ndx_lengths
+	END-IF.
+
+	%BEG
+	ALLOC_END: ent_msg_history (
+	  .qname(
+	    .idbank = link_bnk_id,
+	    .idname = prm_gen_vstr_ndx_qname,
+	    .idloc = NULL),
+	  .qtype = "QTYP$_GEN_VSTR_INDEX",
+	  .memo = NULL, ALLOC_JOIN:  api_gen_vstr_ndx(
+		.vstr_key change,
+		.systime Now,
+		.txt = ent_ftr_set.trn_ref));
+	%END.
+
+x20_sndndx_join_end.
+	Exit.
+
+x30_snd_mirlog_and_memo.
+
+* Make MIR log for ACK'ed or NAK'ed transmitted message
+* The message history memo of the log entry is constructed from the MIR and (if NAK)
+* the reason code of the SWIFT F21 message.
+* If a log entry is not being made because the SWF2 send log is not defined, then
+* make the "Ack MIR:" memo as a SYS_MEMO instead.
+
+	IF Lcl_mir_length = Zero
+	  GO TO x30_snd_mirlog_and_memo_end			%^ No MIR parsed from header; nothing to do here
+	END-IF.
+
+* Construct the ACK or NAK log memo string
+	%BEG
+	Tmp_cmp ^Out(tmp_vstr)
+		Lcl_reason (
+			^IF_NULL ("Ack MIR:" | lcl_mir),
+			^IF_NOTNULL ("Nak MIR:", | lcl_mir, "; Reason=", | Lcl_reason)), /;
+	%End.
+
+
+	IF Fin_snd_swf2log_name_length = 0
+* Log entry is not being made; make a SYS_MEMO instead
+	  %BEG
+	  ALLOC_END: Ent_msg_history(
+				.Qname( .Idbank = Link_bnk_id,
+					.Idloc = NULL,
+					.Idname= "*SYS_MEMO" ),
+				.Memo = Tmp_vstr,
+				.Qtype = "OBJTYP$_NULL" );
+	  %END
+	  GO TO x30_snd_mirlog_and_memo_end
+	END-IF.
+
+
+	%BEG
+	ALLOC_END: ent_msg_history (
+	  .qname(
+	    .idname = Fin_snd_swf2log_name,
+	    .idloc = null),
+	  .qtype = "QTYP$_SWF2_LOG",
+	  .memo = Tmp_vstr, ALLOC_JOIN: Fin_snd_swf2log (
+						.systime Now,
+						.mir = Lcl_mir));
+	%END.
+
+x30_snd_mirlog_and_memo_end.
+	Exit.
+
+x35_nak_mirlog.
+
+* Make MIR log for ACK'ed or NAK'ed transmitted message
+	IF Fin_nak_swf2log_name_length = 0 OR Lcl_mir_length = Zero
+	  GO TO x35_nak_mirlog_end
+	END-IF.
+	%BEG
+	ALLOC_END: ent_msg_history (
+	  .qname(
+	    .idname = Fin_nak_swf2log_name,
+	    .idloc = null),
+	  .qtype = "QTYP$_SWF2_LOG",
+	  .memo = NULL, ALLOC_JOIN: Fin_nak_swf2log (
+						.systime Now,
+						.mir = Lcl_mir));
+	%END.
+
+x35_nak_mirlog_end.
+	Exit.
+
+x40_rcv_mirlog.
+
+* Make MIR log for received message
+	IF Fin_rcv_swf2log_name_length = 0 OR Lcl_mir_length = Zero
+	  GO TO X40_rcv_mirlog_end
+	END-IF.
+	%BEG
+	ALLOC_END: ent_msg_history (
+	  .qname(
+	    .idname = Fin_rcv_swf2log_name,
+	    .idloc = null),
+	  .qtype = "QTYP$_SWF2_LOG",
+	  .memo = NULL, ALLOC_JOIN: Fin_rcv_swf2log (
+						.systime Now,
+						.mir = Lcl_mir));
+	%END.
+
+x40_rcv_mirlog_end.
+	Exit.
+
+X50_ACKMSG_MEMOS.
+
+* Accumulate text into tmp_big_vstr, but stop if 144 bytes is exceeded
+	%BEG FIRST: ent_text_seq; %END.
+	MOVE 0 TO tmp_big_vstr_length.
+
+	PERFORM WITH TEST AFTER UNTIL SEQ_END_IS IN ent_text_seq_cursor
+				OR tmp_big_vstr_length > 144		%^ Leave room for "*ACKMSG:" on up to 2 memo lines
+				OR txt of ent_text_seq (1:3) = "{S:"	%^ Stop at S-block
+
+	  IF Txt_length of Ent_text_seq_lengths > 0
+	    MOVE txt of ent_text_seq (1:Txt_length of Ent_text_seq_lengths) TO
+				tmp_big_vstr (tmp_big_vstr_length + 1: Txt_length of Ent_text_seq_lengths)
+	    ADD Txt_length of Ent_text_seq_lengths TO tmp_big_vstr_length
+	  END-IF
+	  %BEG NEXT: Ent_text_seq; %END
+
+	END-PERFORM.
+
+* Pack the text of the ACK message into one or two SYS_MEMO's, with "*ACKMSG:" prefix on each
+	MOVE 1 to tmp_offset.
+	IF tmp_big_vstr_length > 144 THEN MOVE 144 TO tmp_big_vstr_length END-IF.
+
+	PERFORM UNTIL tmp_offset > tmp_big_vstr_length
+
+	  IF (tmp_big_vstr_length + 8) > %SIZ (ent_msg_history.memo) THEN
+	    SUBTRACT 8 FROM %SIZ(ent_msg_history.memo) GIVING tmp_vstr_length
+	  ELSE
+	    MOVE tmp_big_vstr_length TO tmp_vstr_length
+	  END-IF
+	  MOVE "*ACKMSG:" TO tmp_vstr (1:8)
+	  MOVE tmp_big_vstr (tmp_offset:tmp_vstr_length) TO tmp_vstr (9:tmp_vstr_length)
+	  ADD tmp_vstr_length TO tmp_offset
+	  ADD 8 TO tmp_vstr_length
+	  %BEG
+	  ALLOC_END: ent_msg_history (mod,
+				 .qname(
+					.idbank  = Link_bnk_id,
+					.idloc   = NULL,
+					.idname  = "*SYS_MEMO"),
+				 .qtype = "OBJTYP$_NULL",
+				 .memo  = tmp_vstr);
+	  %END
+
+	END-PERFORM.
+
+X50_ACKMSG_MEMOS_END.
+	Exit.
+
+X60_DLV_ACTIONS.
+
+* The message is a DLV_ACK or DLV_CNF. Release associated sub-histories if applicable
+	%BEG Ent_msg_history EQUATE: Ent_msg_subhist ^FIRST (NOMOD); %END
+	IF idName of qname OF ent_msg_subhist(1:4) NOT = "*DST"
+	  GO TO X60_DLV_ACTIONS_END
+	END-IF.
+
+	%BEG
+	Ent_msg_subhist CONN: Ent_dst_set (MOD);
+	NEXT: Ent_msg_subhist;
+	%END.
+
+* Set up delivery state flag value
+    	IF dlvrej in isi2_msg_type
+      	  MOVE "N" TO Tmp_vstr (1:1)                                    %^ #117738
+    	ELSE
+      	  MOVE "D" TO Tmp_vstr (1:1)                                    %^ #117738
+	END-IF.
+	MOVE 1 TO Tmp_vstr_length.
+
+* Update DST_SET fields to reflect delivery state of this subhistory
+	%BEG
+	ent_dst_set(
+	  .dst_state = Tmp_vstr,	%^ Set state = D/N
+	  .dst_time NOW);		%^ Set delivery time
+	%END.
+
+* Store MIR, and append "/<nak-code>" if nak.
+	IF Lcl_mir_length > 0
+	  %BEG
+	  Tmp_cmp ^OUT(ent_dst_set.dst_outgoing_ref),
+	  	lcl_mir, lcl_reason (^IF_NOTNULL("/",^_)), /;
+	  %END
+	END-IF.
+
+* For admin msg, done now
+	IF (admin IN msgtype OF ent_msg_union)
+	  GO TO X60_DLV_ACTIONS_CLEANUP
+	END-IF.
+
+* Scan FORWARDS thru subhistory and update target set
+	%beg first: ent_msg_subhist; %end.
+	MOVE SPACE TO Lcl_acktype.
+
+	PERFORM UNTIL (seq_end_is IN ent_msg_subhist_cursor) OR (lcl_acktype NOT = SPACE)
+
+	  EVALUATE idname OF qname OF ent_msg_subhist
+
+	    WHEN "*CDT"
+	      MOVE "1" TO Lcl_acktype
+	      %BEG
+	      ent_credit_set MOD;
+	      ent_credit_set(.flgs.cdt_pay_flg = Tmp_vstr);
+	      ent_credit_set NOMOD;
+	      %END
+
+	    WHEN "*CDT_SECWIR"
+	      MOVE "2" TO Lcl_acktype
+	      %BEG
+	      ent_credit_set MOD;
+	      ent_credit_set(.flgs.cdt_secwir_flg = Tmp_vstr);
+	      ent_credit_set NOMOD;
+	      %END
+
+	    WHEN "*CDT_CNF"
+* Dst_set state already updated above - just exit.
+	      MOVE "C" TO Lcl_acktype
+	      GO TO X60_DLV_ACTIONS_CLEANUP
+
+	    WHEN "*DBT_CNF"
+	      MOVE "D" TO Lcl_acktype
+	      GO TO X60_DLV_ACTIONS_CLEANUP
+
+	  END-EVALUATE
+
+	  %BEG Next: ent_msg_subhist; %END			%^ Continue scan
+
+	END-PERFORM.
+
+* Fall through if this is the primary or secondary wire advice
+	IF dlvrej in isi2_msg_type
+	  GO TO X60_DLV_ACTIONS_CLEANUP
+	END-IF.
+
+* Shuffle to top-level history for ENQ_ calls
+	%BEG
+	BREAK: Ent_msg_history;
+	Ent_msg_union.Msg_history CONN: Ent_msg_history (NOMOD);
+	%END.
+
+* Confirmations are deferred if this is pre-value-date
+	IF (payadv_enq_cnf OF menu_cfg = "F") AND (lcl_acktype = "1")
+	  CALL "ENQ_SEC_WIRE"
+	end-if.
+
+* ENQ_CONFIRMATIONS: primary or secondary wire under certain circumstances.
+* Calculate accounting mode of message.
+	Call "ACCOUNTING_MODE" returning Lcl_actg_mode.
+	evaluate true
+	  when (Pre_no_accounting in Lcl_actg_mode)		%^ "PRE" preadvise message on send date
+		continue					%^ Defer all
+
+	  when (Split_accounting_debit in Lcl_actg_mode)	%^ "SPL" split accounting message on send date (1ary/2ary wire ack)
+		move 1 to Lcl_cnf_flag				%^ Debits only
+		call "ENQ_CONFIRMATIONS" using
+			by value 2
+			by reference Lcl_cnf_flag
+
+	  when (lcl_acktype = "1")				%^ 1ary wire ack only
+		move 3 to Lcl_cnf_flag				%^ Default - enqueue all confirms (including cdt cnf's)
+		call "ENQ_CONFIRMATIONS" using
+			by value 2
+			by reference Lcl_cnf_flag
+	end-evaluate.
+
+X60_DLV_ACTIONS_CLEANUP.
+
+	%BEG
+	BREAK: Ent_dst_set;
+	BREAK: Ent_msg_history;
+	Ent_msg_subhist EQUATE: Ent_msg_history (NOMOD);
+	%END.
+
+X60_DLV_ACTIONS_END.
+	exit.
+
+
+x70_swf_dst_ndx.
+* Optionally log message to SWF_DST_NDX.
+
+* Skip if logging disabled
+	if (swf_dst_ndx_name_length = 0) go to x70_swf_dst_ndx_end end-if.
+
+* If we're not in a subhistory, skip.  Else connect/break dst_set
+	%beg first: ent_msg_history; %end.
+	if (not(idname of ent_msg_history = "*DST")) go to x70_swf_dst_ndx_end end-if.
+	%beg
+	ent_msg_history conn: ent_dst_set;
+	break: ent_dst_set;
+	%end.
+
+* Skip if destination address not recorded in dst.dst_outgoing_ref.
+* We depend on the isi2cbt_xmtedt module to store the destination address here.
+* It will be overwritten later in this module.
+	if (not(dst_outgoing_ref_length of ent_dst_set_lengths = 8 or 11))
+	  go to x70_swf_dst_ndx_end
+	end-if.
+
+* Trim BIC if ending in "XXX"
+	%beg tmp_memo = ent_dst_set.dst_outgoing_ref; %end.
+	if (tmp_memo(9:3) = "XXX")
+	  move spaces to tmp_memo(9:3)
+	  move 8 to tmp_memo_length
+	end-if.
+
+* Okay, index the message on SWF_DST_NDX
+	%beg
+	alloc_end: ent_msg_history(
+	  .qname(
+	    .idbank = link_bnk_id,
+	    .idloc = null,
+	    .idname = swf_dst_ndx_name),
+	  .qtype = "QTYP$_GEN_VSTR_INDEX",
+	  .memo = null,
+	  alloc_join: swf_dst_ndx(
+	    .vstr_key = tmp_memo,
+	    .systime now,
+	    .txt = ent_ftr_set.trn_ref));
+	%end.
+
+x70_swf_dst_ndx_end.
+	exit.
 
-				ValidationEventHandler valEventHandler = new ValidationEventHandler(ValidationCallBack);
-				try
-				{
-					doc.LoadXml(XmlText);
-					doc.Validate(valEventHandler);
-				}
-				catch (XmlSchemaValidationException xmlValidationError)
-				{
-				// need to interogate the Validation Exception, for possible further 
-				// processing.
-					string message = xmlValidationError.Message;
-	        Console.WriteLine("\r\nError Validating XML {0}...", message);
-					stat = false;
-				}
-    }
-
-    //Display any warnings or errors.
-    private static void ValidationCallBack(object sender, ValidationEventArgs args)
-    {
-        if (args.Severity == XmlSeverityType.Warning)
-            Console.WriteLine("\tWarning: Matching schema not found.  No validation occurred." + args.Message);
-        else
-            Console.WriteLine("\tValidation error: " + args.Message);
-				stat = false;				
-    }
-	}
-}
-
-
--------------------   Cheet Sheet MTS
-
-user - mtsusn/mts12345
-
-areas:
-	usn_oat
-	jpt_oat
-	usn_uat
-
-ip - mtsdev - 10.193.31.249
-
-jn1, jn2 LWOMEN13
-
-Germany
-Server ip address 10.193.60.112
-id mtsdef
-pasword dev12345
-
-MQ Utils
-/usr/payments_def/bin/mqudef
-
-/shared/home/mtsjpt/jpmqu
-
-SWF Real Duke_2004
-
-Commands:
-
-ca - change area
-ent area 
-ent p
-ent 
-prt_queue -name PAYADV_LOG -b SCB
-prt_queue -b scb -na fedin_log -pe 07-APR-2015 
-q_util -inc /*///swfinq -notrn (-static or -message or -nostatic or -nomessage)
-q_util -summary -notrn
-q_util -inc /SCB///FEDPNDSACKQ2 -notrn -message -unqueue_every_item
-idi message:/2 src_code: msgtype: end:
-idi_read_only -db_dump -show_null
-source /usr/intranet/mtsusnuat/mts/40/z_scb/config/int_pre_sod.cfg
-
-stop_up_down -external
-stop_up_down -internal
-
-
-sfm_linecmd -lt SCBLUS30A -login
-sfm_linecmd -lt SCBLUS30A -select -subset system,urgent,normal -state YY
-
-move_utility  -f /scb//bkthi1_ofacq -t /scb//hr_bkt_ofacq -c 3
-
-show_root_idx INDEX_NAME
-
-G:\Technology-TSD\AIX\4.0 USN Installation and Configuration\ACI Documentation --  docs 
-G:\Technology-TSD\AIX\4.0 USN Installation and Configuration\Case Management 4.0 - bugs are reported
-
-MTS_Entia_Database_Guide
-MTS_40_Utilities_and_Commands_Guide
-
-view $(bld_path_ls 'AREA_CONFIG_PATH/mts.cfg')
-
-bld_path_ls AREA_PATH/bld_path_ls
-
-/var/adm/syslog.out - look for messages, traps, etc.
-
-export ROUTE_TRACE=Y	- turn on tracing
-
-find  /usr/  -name LAU* -type f 2>/dev/null
-
-inetmake SQUEAKY_CLEAN
-			
-msg_util -load -file msg_util_FED_Jacob.txt -b SCB -source FED -que FEDINQ
-
-move_utility -f /scb//dda_backend -t /scb//cut_excq -c 1 -memo "CMP/F  7-MAY-2015 11:39:56.27"
-
-sed “s/150702/150814/g” f1 > F2  -----  global substitution
-find *telco* -mtime +6 -type f -exec rm  {} \; - removes files older than 6 days
-
-edump -f | gzip -c > AREA.edmp.gz - make dump of the entia DB
-gunzip -cf AREA.edmp.gz | eload AREA -f
-
-DEBUG
-handle SIGUSR2 nostop noprint
-steps:
-1. file xxx
-2. b reak
-3 run program args
-
-Do this when recover:  usn_dvl
-LIBPATH=$LIBPATH:/usr/local/intranet/ace_uat_usn_rt/hf_acert/bin
-To compile in scb_bld_rls.
-SBJ_AREA_ROOT_DIR should be local
-
-Ultra EDIT
-CTRL F5 - to lower csase
-ALT F5 - to upper case
-___________________________________________________________________________________
-open SPR  !!!!!!!
-
-/case management 4.0/SCB ACI SPR Reporting Sheets USN MTS 4.0 Jan - Jun2015/
-open SCB ACI SPR Reporting Sheet for USN MTS 4 0 Project_20150408.xls and reserve the next SCBxxx number
-need idi dump, msgprint, docs. 
-collect all the info in /usr/psstemp_uat_usn/cases open new dir for new SCBxxx
-make new folder in G:\Technology-TSD\AIX\4.0 USN Installation and Configuration\Case Management 4.0
-move all the stuff from AIX 
-   SecureCRT file--> connect sftp session
-    lcd g:\tec....\ dir from g: drive with all rabbish
-    lpwd
-    lls
-    get -a /usr/psstemp_uat_usn/cases/SCBxxx
-Copy SPRxxx.doc file from the previous case and edit it.
-
-Go to ACI web site ( user id jacob.novak@sc.com/Duk)
-    open a new case See the pics from Karen
-    submit the spr
-    get the SPR # and plug it in to the .doc file in the G: drive
-    zip all files from G: and attach it to the SPR (use 'attach files') (NOT my Vault)
-
-when ACI assigns the SPR for it 
-open SCB ACI SPR Reporting Sheet for USN MTS 4 0 Project_20150408.xls and update
-
-_____________________________________________________
-
-
-bash cmds
-while [ $a -lt 2 ]; do echo $a; done
-
-_____ .mk3 fix
-custom_subs/z_scb_cust_ar_fifo.o" \
--e "-bE:$(SBJ_ROOT_DIR)/lib/libcustom_subs.imp" -l "-lisode  
-   | this space
-______________________________________________________
-
-
-Installing ACI soft
-
-
-/usr/intranet/ship/usnmts  -- you will see all our bundle deliveries. It is done by downloading stuff from ACI
-if it ends in f, it's a full bundle or hot fix
-if it ends in s, it's a snapshot
-
-logon to the other test server: 10.193.31.10
-Be careful with the ID/password:
-pmaninst/Test!2345  -- The pmaninst ID is just for installing pakman
-once you get on, select #10 (Run Pakman) and then at the prompt, type "list"
-you'll see what's there.
-mtsusn/scope@123
-Packman commands: read, preview, install, verify
-
-Examples:
-
->>>>pakman (product:mtsusnsit) > list   
-	  #  Level             Installed in
-	---  ----------------  --------------------------------------------------
-	     intranet.appsupport 10: Additional files from Application and Technical Support
-	  1  * 10.0.127.0      product: mtsusnprd  mtsusnuat  
-
->>>>> pakman (product:mtsusnsit) > preview 1
-	Previewing installation of intranet.appsupport 10.0.127.0
-	Additional files from Application and Technical Support
-
-                                                                             
-	Installation Plan:
-	------------------
-	This installation will make the following changes
-
->>>>>pakman (product:mtsusnsit) > install 1
-	Installing intranet.appsupport 10.0.127.0
-	Additional files from Application and Technical Support
-
-	Installing: 100% (done)                                                      
-	Set permissions: 100% (done)                                                 
-	Install of intranet.appsupport completed successfully!
-
->>>>>>>pakman (product:mtsusnsit) > verify 1
-	intranet.appsupport 10.0.127.0 (product:mtsusnsit): Verified      
-
->>>>>>>pakman (product:mtsusnsit) > uninstall 1
-	Remove intranet.appsupport 10.0.127.0 from "product:mtsusnsit"? (y/n): y
-	Uninstalling: 100% (done)                                                    
-	Removed /usr/intranet/mtsusnsit/appsupport.
-
-	intranet.appsupport has been successfully uninstalled.
-    
-
-___________________________________________________________
-  *MRSTOP/*MR/MAP/   /Y/$$$SWF
-
-
-_________________________________________________________________
-
-load msgs via mq
-
-this is the c program of loading messages into MQ
-/shared/home/mtsjpt/jpmqu
-
-Here are all parameters you can pass
-ATTENTION: Each parameter must have a minus (-) before it. 
-The mqutil command reads messages from either a file or MQ queue, extracting
-the specified messages, and writing them to a file, a queue or the screen.
-The mqutil command without parameters prompts an interactive session.
-However, parameters may be specified in any orderjn1	lwomen13
-j and are
- -h, -?          (help, to get only this screen)
- -if filename    (input file)
- -iq queuename   (input MQ queue [browse mode]--upper/lower case)
- -ib queuename   (input MQ queue [browse with detail]--u/l case)
- -id queuename   (input MQ queue [delete mode]--upper/lower case)
- -im queueMgr    (input MQ queue manager--upper/lower case)
- -of filename    (output file)
- -oq queuename   (output MQ queue--upper/lower case)
- -om queueMgr    (output MQ queue manager--upper/lower case)
- -os             (output to the SCREEN
- -ct count       (number of messages to be extracted, 0 for ALL)
- -cp             (DEFAULT--copy/select all, limited only by count)
- -sm selectMask  (select by mask--amount, field 20, etc.)
- -sr selectRange (select by sequence num, for example, 000000-000005)
- -st selectType  (select by message type, specify I or O).
-you can execute it from home simply like this
-jpmqu -if FileName 
-and follow it interatively
-
-or you can simply use a single line command:
-jpmqu -if eBBS_Memo.txt -oq JPT.MPS.MTS.SWIN -om JPMTS1S1.
-jpmqu is the c program
-eBBS_Memo.txt is the file name
-JPT.MPS.MTS.SWIN is the MQ queue
-JPMTS1S1 is the Queue Manager name.
-
-first let's talk about the Message format:
-These must be standard SWIFT messages
-1. each line ends with CR + LF
-2 each message ends with LF  (no CR here).
-
-to re-seq isn/osn
-----------------------
-/shared/home/mtsjpt/jpmqu -if FileNae -oq EFF.MPS.MTS.SWIN_GMS -om DEMTS1S1
-/shared/home/mtsjpt/jpmqu -of FileName -iq EFF.MPS.MTS.GMSIN -im DEMTS1S1
-
-
-/shared/home/mtsjpt/jpmqu -oq JPT.MPS.TEMP -om JPMTS1S1 -if FileName 
-
-______________________________________________________________
-
-To use this trick to disable USB ports, follow the steps given below:-
-
-Click on Start.
-Click on Run. If you cannot find RUN, type it in the search box.
-Type "regedit" without quotes. This will launch the Registry Editor.
-Navigate to  HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usbstor.
-In the work area, double click on Start.
-In the Value Data box, enter 4.
-Click on OK.
-Close Registry Editor and refresh your desktop.
-To re-enable access to your USB ports, enter 3 in the Value Data box in Step 6.
-
-__________________________
-
-prt_queue -b scb -na  SCBA_F_RCV -pe 12-may-2015 - swf incomings
-CHIPSRCV - incoming CHPs
-FEDIN_LOG
-MTRANSFTRENT_LOG 
-
--history SUMMARY
-_____________________________________________________________________________
-1. talk to Diane for a test area for CMS
-2. configure the test area to be identical to jpt_ust2 (currently doing UAT)
-3.  to make it easier about all queues allocated, you can shutdown jpt_ust2 (if no one is doing UAT) and copy that database over too
-and now this test area will be identical to jpt_ust2
-then that's about half done already
-
-ln -s -f /usr/intranet/mtsjptuat/mts/40/lib/z_scj_libcustom_subs.a libcustom_subs.a (change softlink)
-                 real directory                                      the softlink name
-
-bencmark
-
-Talk to Daine to see if it's OK to use your DB for BM
-if it's agreed, you can use the same DB in jpt_uat
-change port number in remote: /stop  ... port number for MatchServer is in area.cfg
-change the area description in bank:   (idi bank: all: end: and you see it)ls
-echo "yes" | mts -c
-mts -r
-before this, see if Diane wants to move to a new business date too
-and also if she prefers to unqueue all messages in all queues
-if yes, then
-q_util -inc /SCB/*//*q -unqueue_every_item
-q_util -inc /SCB/*//*q -mess -unqueue_every_item
-.
-then you're ready
-
-swift/Dog+2004
-
-----------------germany
-
-
-b3 lqm
-load on mqqueue
-
-/usr/payments_def/bin/mqudef -if /shared/home/mtsdef/DE_CLS.txt -oq EFF.MPS.MTS.GMSIN -om DEMTS1S1
-
-Rivera, Julia-  DEF_STOR_TDE_CERSmmm.BASH
-
----- set line seqs to 1!!!
-/usr/local/intranet/areas/jpt_sit1/scb_scripts/JPT_reset_seq.BASH
-
--- Dir where MQ writes all stuff ---
-
-/usr/payments_jpt/msgs/
-
-
-export ORACLE_HOME=/u01/app/oracle/product/11203/Client_1
-export ORACLE_SID=USNRGW_DAAS
-$ORACLE_HOME/bin/sqlplus MTS_USNRGW_APP/mts_usnrgw_app_123@USNRGW_DAAS
-
-select amount  from message where trn_date=TO_DATE('17-mar-2015','dd-MON-yyyy')  and trn_number=200;
-
-Paula  .
-match_server_linecmd debug
-- reproduce the issue
-match_server_linecmd dump
-match_server_linecmd trace_off
-- send us the MatchTrace*.log file
