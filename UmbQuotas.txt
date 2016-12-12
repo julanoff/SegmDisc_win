@@ -1,1 +1,36 @@
 
+To do:
+
+1. Picture how this looks today
+2. Picture for first rollout
+3. Picture of the phase3  rollout
+
+Describe phase 1
+
+Find SME in :
+1. medical records
+2. EMR exchanges 
+3. 
+
+Come up with a high level approach to the design
+That includes:
+1. what kind of request/reply 
+2. what needs to be transfered ( what kind of info, data)
+3. the format of this info
+4. seperate emr on basic blocks of info with permissions and rights
+5. map the accessibility diagram, who , why and how gets access to certain blocks.
+6. create a basic transportation format ( high level)
+7. define certain fields that are needed to transfer pertinant info
+
+Describe phase 2
+
+Find SME in  cloud computing
+
+start designing Data definition layer
+
+
+Describe Phase 3
+Beta rollout with small number of participants ( several docs, patients, hosp, labs)
+
+
+
