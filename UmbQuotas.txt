@@ -4,13 +4,14 @@ To do:
 1. Picture how this looks today
 2. Picture for first rollout
 3. Picture of the phase3  rollout
+4. mention that MEDical News article
 
 Describe phase 1
 
 Find SME in :
-1. medical records
+1. medical records formats
 2. EMR exchanges 
-3. 
+3. EHR info keepers /Vault (like Microsoft Health Vault)
 
 Come up with a high level approach to the design
 That includes:
@@ -18,19 +19,22 @@ That includes:
 2. what needs to be transfered ( what kind of info, data)
 3. the format of this info
 4. seperate emr on basic blocks of info with permissions and rights
-5. map the accessibility diagram, who , why and how gets access to certain blocks.
-6. create a basic transportation format ( high level)
-7. define certain fields that are needed to transfer pertinant info
+5. determine how to divide the EMR by 
+`   a. relevance ( exa: urologist does not need info about alergies, or perhaps very high level note)
+    b. permission to access ( exa: foot doc does not need to see scan of the head)
+6. map the accessibility diagram, who , why and how gets access to certain blocks.
+7. create a basic transportation format ( high level)
+8. define certain fields that are needed to transfer pertinant info
 
 Describe phase 2
 
 Find SME in  cloud computing
-
+Find partners among 'banks' to develop a beta version ( perhaps offer an piece of the action)
 start designing Data definition layer
 
 
 Describe Phase 3
-Beta rollout with small number of participants ( several docs, patients, hosp, labs)
+Beta rollout with small number of participants ( several docs, patients, hosp, labs, banks)
 
 
 
