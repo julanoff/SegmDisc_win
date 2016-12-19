@@ -37,4 +37,26 @@ Describe Phase 3
 Beta rollout with small number of participants ( several docs, patients, hosp, labs, banks)
 
 
+Forces that will govern the whole process.
+Similarity with the banks
+People have not been and are not forces to keep their mony in the banks. The convenience and different perks are forcing people to the banks. After they deposit their money in the bank the people demand certain services with it.
+In HR record keeping. 
+There will be several HRV (Health Record Vaults) were people will keep their records.
+What will force them to do it?
+Ability to earn something by allowing anonimous access for researches, statistics, pharma sientists.
+Convenience to access and manage own records real time.
++++
+
+The competition between the HRVs will drive to innovating the perks, creating new apps, etc.
+It will lead to demand to HRP (health care provider) to participate in this activities.
+Before a person goes to a doc or lab he or she will demand participation in HRExchange.
+There will be competition among HRVs and HRPs for a patient which will enhance this process.
+It will evolve with time. New services, perks, applications will be created.
+IT people will compete in the new tremendous market of doctors, patients, hospitals, labs, etc.
+It is similar to large companies like FundTEch, ACI who create MTS application for large players.
+Variety of mobile apps creators to enable people's access to own information.
+
+
+
+
 
