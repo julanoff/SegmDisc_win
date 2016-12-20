@@ -6,6 +6,57 @@ To do:
 3. Picture of the phase3  rollout
 4. mention that MEDical News article
 
+GOAL:
+
+Create an infrastracture for ALL health care participants that enables secure, robust, reliable health info exchange.
+It should be independant from the internal record format of the participants.
+It should use common , standard communication protocols that will accomodate ALL necessary exchanges.
+It should allow secure and reliable access to the clients' information which resides in the HRV.
+
+Justification for the project:
+
+Market Forces that will govern the evolution of the whole process.
+The first step is to build rudimentary infrastructure.
+Similarity with the banks money transfer networks (Bankwire, SWift, Telex, etc)
+People have not been forced to keep their money in the banks. The convenience and different benefits are forcing people to the banks. After they deposit their money in the bank the people demand certain services with it.
+In HR record keeping. 
+There will be several HRV (Health Record Vaults) where people will keep their records.
+What will force them to do it?
+Ability to earn something by allowing anonimous access for researches, statistics, pharma sientists.
+Convenience to access and manage own records real time.
+Incentives to share the information to gain advance warning on certain abnormalities in the vitals
+
+Future possible services and advances:
+Virtual docs where several specialists will monitor your health virtually
+This way if a person develops certain disease he or she can join the specialize network of physicians who will
+monitor their conditions virtually, order tests, prescribe medicine, etc. If needed the person is directed to visit a doc.
+That alone will drive health care cost tremendously.
++++
+
+The competition between the HRVs will drive the innovation of the benefits, creating new apps, etc.
+It will lead to demand to HRP (health care provider) to participate in this activities.
+Before a person goes to a doc or lab he or she will demand participation in HRExchange.
+There will be competition among HRVs and HRPs for a patient which will enhance this process.
+It will evolve with time. New services, benefits, applications will be created.
+IT people will compete in the new tremendous market of doctors, patients, hospitals, labs, etc.
+It is similar to large companies like FundTEch, ACI who create MTS application for large players.
+Variety of mobile apps creators to enable people's access to own information.
+
+
+
+Participants:
+HRVs ( similar to the banks)
+Hospitals, large Labs ( similar to the corporate/financial institutions)
+3rd party access providers - IT organizations that provide access to small Labs, doc offices, etc.
+
+
+
+
+
+
+APPROACH:
+It will be a phased approach to this project. 
+
 Describe phase 1
 
 Find SME in :
@@ -35,28 +86,4 @@ start designing Data definition layer
 
 Describe Phase 3
 Beta rollout with small number of participants ( several docs, patients, hosp, labs, banks)
-
-
-Forces that will govern the whole process.
-Similarity with the banks
-People have not been and are not forces to keep their mony in the banks. The convenience and different perks are forcing people to the banks. After they deposit their money in the bank the people demand certain services with it.
-In HR record keeping. 
-There will be several HRV (Health Record Vaults) were people will keep their records.
-What will force them to do it?
-Ability to earn something by allowing anonimous access for researches, statistics, pharma sientists.
-Convenience to access and manage own records real time.
-+++
-
-The competition between the HRVs will drive to innovating the perks, creating new apps, etc.
-It will lead to demand to HRP (health care provider) to participate in this activities.
-Before a person goes to a doc or lab he or she will demand participation in HRExchange.
-There will be competition among HRVs and HRPs for a patient which will enhance this process.
-It will evolve with time. New services, perks, applications will be created.
-IT people will compete in the new tremendous market of doctors, patients, hospitals, labs, etc.
-It is similar to large companies like FundTEch, ACI who create MTS application for large players.
-Variety of mobile apps creators to enable people's access to own information.
-
-
-
-
 
