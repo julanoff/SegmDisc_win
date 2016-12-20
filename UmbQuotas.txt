@@ -6,7 +6,7 @@ To do:
 3. Picture of the phase3  rollout
 4. mention that MEDical News article
 
-GOAL:
+OBJECTIVES:
 
 Create an infrastracture for ALL health care participants that enables secure, robust, reliable health info exchange.
 It should be independant from the internal record format of the participants.
@@ -29,7 +29,7 @@ Incentives to share the information to gain advance warning on certain abnormali
 Future possible services and advances:
 Virtual docs where several specialists will monitor your health virtually
 This way if a person develops certain disease he or she can join the specialize network of physicians who will
-monitor their conditions virtually, order tests, prescribe medicine, etc. If needed the person is directed to visit a doc.
+monitor their conditions virtually, order tests, prescribe medicine, etc. If needed, the person is directed to visit a doc.
 That alone will drive health care cost tremendously.
 +++
 
@@ -42,6 +42,40 @@ IT people will compete in the new tremendous market of doctors, patients, hospit
 It is similar to large companies like FundTEch, ACI who create MTS application for large players.
 Variety of mobile apps creators to enable people's access to own information.
 
+Similarity with banking network evolvement.
+
+At the beginning of banking there were a lot of branches across the country ( Individual Medical Accounts with 
+different holders) that had troubles to communicate in order to conduct banking business as we know it today.
+The government realized the problem and created the Federal Reserve network. 
+After that the banking became dynamic, accessible and more useful.
+Since than other private and semi private networks sprang up like CHIPS and SWIFT - the survivors,
+BankWire and other - extinct ones.
+They allowed US dollar clearing and highly sensitive financial message exchanges around the globe. 
+Any institution could become a member as long as it complies with rules and follow the communication protocol.
+The medical record exchange will need similar approach. 
+
+It took a while until people embraced online banking. During this process people started to get comfortable with
+doing financial transaction over the net. That led to make people in charge of the management of their finances, 
+giving instructions to the banks who to pay and how. This part varies from bank to bank.
+
+The EHRS should be approached as such.
+Each individual needs an account with EHRS holding company (similar to banks).
+A person should be able to give instructions to the record holding company how to move his own records from one participating institution to another.
+A record holding companies could charge fees for certain services. The market will regulate those fees
+and services. (again similar to the banks)
+
+Doctors, hospitals, laboratories should be mandated to transfer patient's data over to the specified institution
+upon patient's request.
+When  admitted to the hospital, a person gives authorization to the hospital or doctor to access the records.
+Some work is being done to establish Medical Accounts for Individuals. The means of communications between
+Individual Medical Account and Providers, Doctors, Laboratories needs to be addressed.
+There is a need for secure communication among myriad of Providers, Doctors, Individuals, Laboratories etc. ,
+maintaining unique Ids and addresses of each participant, 
+garantiing secured delivery of each transaction and many more other aspects of modern exchanges.
+It is a process that will be evolving through times. But the ball needs to start rolling and your Company could start
+this process.
+
+
 
 
 Participants:
@@ -50,8 +84,10 @@ Hospitals, large Labs ( similar to the corporate/financial institutions)
 3rd party access providers - IT organizations that provide access to small Labs, doc offices, etc.
 
 
+Current development and standards
 
-
+According to the ASTM E1384 Standard Guide for Content and Structure of the Electronic Health Record1 the EHR serves all of the functions of the traditional health record with many advantages. 
+Usage of E1384 standards and E1633 coded values in the development of the EHR
 
 
 APPROACH:
