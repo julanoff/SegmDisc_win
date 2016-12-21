@@ -13,12 +13,15 @@ It should be independant from the internal record format of the participants.
 It should use common , standard communication protocols that will accomodate ALL necessary exchanges.
 It should allow secure and reliable access to the clients' information which resides in the HRV.
 
-Justification for the project:
+              ADD DIAGRAM here
+
+How and why this project will succeed:
 
 Market Forces that will govern the evolution of the whole process.
 The first step is to build rudimentary infrastructure.
 Similarity with the banks money transfer networks (Bankwire, SWift, Telex, etc)
-People have not been forced to keep their money in the banks. The convenience and different benefits are forcing people to the banks. After they deposit their money in the bank the people demand certain services with it.
+People have not been forced to keep their money in the banks. The convenience and different benefits are forcing people to the banks.
+After they deposit their money in the bank the people demand certain services with it.
 In HR record keeping. 
 There will be several HRV (Health Record Vaults) where people will keep their records.
 What will force them to do it?
@@ -86,7 +89,8 @@ Hospitals, large Labs ( similar to the corporate/financial institutions)
 
 Current development and standards
 
-According to the ASTM E1384 Standard Guide for Content and Structure of the Electronic Health Record1 the EHR serves all of the functions of the traditional health record with many advantages. 
+According to the ASTM E1384 Standard Guide for Content and Structure of the Electronic Health Record1 the EHR serves all of the
+functions of the traditional health record with many advantages. 
 Usage of E1384 standards and E1633 coded values in the development of the EHR
 
 
@@ -113,12 +117,47 @@ That includes:
 7. create a basic transportation format ( high level)
 8. define certain fields that are needed to transfer pertinant info
 
+Cost:
+SMEs salaries for 1/2 year - ???
+My $
+Possible travel, office space for meetings
+
+Duration: 8 - 9 months after hiring os SMEs.
+
+
 Describe phase 2
 
 Find SME in  cloud computing
 Find partners among 'banks' to develop a beta version ( perhaps offer an piece of the action)
 start designing Data definition layer
+. Login sequence for participants
+. Define the headers and trailers for any transmition
+. Study the  possible usage of the following:
 
+---- Digital Imaging and Communications in Medicine (DICOM) is a standard for handling, storing, printing, 
+ and transmitting information in medical imaging. It includes a file format definition and a network 
+ communications protocol. The communication protocol is an application protocol that uses TCP/IP to
+  communicate between systems. DICOM files can be exchanged between two entities that are capable of 
+  receiving image and patient data in DICOM format. The National Electrical Manufacturers Association (NEMA) 
+  holds the copyright to this standard.[1] It was developed by the DICOM Standards Committee, whose members 
+  are also partly members of NEMA.
+
+               EXCHANGE FORMATS
+----- The HL7 Clinical Document Architecture (CDA) is an XML-based markup standard intended to 
+specify the encoding, structure and semantics of clinical documents for exchange. 
+CDA is an ANSI-certified standard from Health Level Seven International (HL7.org). 
+
+----- The Continuity of Care Document (CCD) specification is an XML-based markup standard intended to specify 
+the encoding, structure, and semantics of a patient summary clinical document for exchange.
+
+
+. Determine what kind of requests are possible from the participants and what info should be sent.
+  this is THE MOST IMPORTANT piece. It will be evolving during the testing/poc process.
+. Requests/Replies - pairs for info exchange
+    . Get info request/Reply with info or Reject with an standard error like no priv or client not found, etc.
+    . 
+
+Determine 
 
 Describe Phase 3
 Beta rollout with small number of participants ( several docs, patients, hosp, labs, banks)
