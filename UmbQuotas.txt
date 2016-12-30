@@ -157,7 +157,9 @@ the encoding, structure, and semantics of a patient summary clinical document fo
     . Get info request/Reply with info or Reject with an standard error like no priv or client not found, etc.
     . 
 
-Determine 
+. Start drafting participants' agreement.
+  It requires legal consulting
+ 
 
 Describe Phase 3
 Beta rollout with small number of participants ( several docs, patients, hosp, labs, banks)
