@@ -11,7 +11,7 @@ OBJECTIVES:
 Create an infrastracture for ALL health care participants that enables secure, robust, reliable health info exchange.
 It should be independant from the internal record format of the participants.
 It should use common , standard communication protocols that will accomodate ALL necessary exchanges.
-It should allow secure and reliable access to the clients' information which resides in the HRV.
+It should allow secure and reliable access to the clients' information which resides in the HRB (health rec bank).
 
               ADD DIAGRAM here
 
@@ -23,10 +23,10 @@ Similarity with the banks money transfer networks (Bankwire, SWift, Telex, etc)
 People have not been forced to keep their money in the banks. The convenience and different benefits are forcing people to the banks.
 After they deposit their money in the bank the people demand certain services with it.
 In HR record keeping. 
-There will be several HRV (Health Record Vaults) where people will keep their records.
+There will be several HRBs (Health Record Banks) where people will keep their records.
 What will force them to do it?
-Ability to earn something by allowing anonimous access for researches, statistics, pharma sientists.
-Convenience to access and manage own records real time.
+Ability to earn something by allowing anonimous access for researches, statistics, pharma scientists.
+Convenience to access and manage own records in real time.
 Incentives to share the information to gain advance warning on certain abnormalities in the vitals
 
 Future possible services and advances:
@@ -36,10 +36,10 @@ monitor their conditions virtually, order tests, prescribe medicine, etc. If nee
 That alone will drive health care cost tremendously.
 +++
 
-The competition between the HRVs will drive the innovation of the benefits, creating new apps, etc.
+The competition between the HRBs will drive the innovation of the benefits, creating new apps, etc.
 It will lead to demand to HRP (health care provider) to participate in this activities.
 Before a person goes to a doc or lab he or she will demand participation in HRExchange.
-There will be competition among HRVs and HRPs for a patient which will enhance this process.
+There will be competition among HRBs and HRPs for a patient which will enhance this process.
 It will evolve with time. New services, benefits, applications will be created.
 IT people will compete in the new tremendous market of doctors, patients, hospitals, labs, etc.
 It is similar to large companies like FundTEch, ACI who create MTS application for large players.
@@ -82,7 +82,7 @@ this process.
 
 
 Participants:
-HRVs ( similar to the banks)
+HRBs ( similar to the banks)
 Hospitals, large Labs ( similar to the corporate/financial institutions)
 3rd party access providers - IT organizations that provide access to small Labs, doc offices, etc.
 
@@ -163,4 +163,39 @@ the encoding, structure, and semantics of a patient summary clinical document fo
 
 Describe Phase 3
 Beta rollout with small number of participants ( several docs, patients, hosp, labs, banks)
+
+
+Revenue projection.
+
+Data from American Hospital Association
+# of hospitals in US - 5627
+# of admissions - 35M / per year of 2014
+Data from CDC.gov
+# of outpatient hospital visits - 125M
+# of visits to physician 928M
+data from American Clinical Lab Association
+7B clinical lab tests per year
+
+
+Each visit is associated with multiple updates to the patient's HR.
+
+Assumtions:
+1 doc visit - 2 updates , 4 requests - 12 transmissions
+1 hosp admission - 20 updates, 40 requests  - 120 transmissions
+1 lab - 1 update, 1 request - 4 transmittions
+
+Assume .01% participation - translates to 40 - 50 M transmittions per year
+
+Pricing should be scalable which depends on the # of trans and agreement with participant.
+Initially assume : price per transmittions $1 ( miniscule compare to the price of those services)
+$40 - $50 M/per year.
+
+Potential
+%50 participation - $20 - $25B /per year.
+
+Final Cost:
+Data Center initially will use cloud from Amazon or IBM - ?
+10 - 15 technical people - $1.6 - $1.8M
+5 managers - 1M
+Sales force - ?
 
