@@ -186,8 +186,9 @@ Assumtions:
 
 Assume .01% participation - translates to 40 - 50 M transmittions per year
 
-Pricing should be scalable which depends on the # of trans and agreement with participant.
-Initially assume : price per transmittions $1 ( miniscule compare to the price of those services)
+Pricing should be scalable which depends on the # of trans, sort of transaction (request, reply, update, etc.) and agreement with
+a participant.
+Initially assume : average price per transmittions $1 ( miniscule compare to the price of the services)
 $40 - $50 M/per year.
 
 Potential
