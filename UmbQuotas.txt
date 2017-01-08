@@ -30,7 +30,7 @@ Convenience to access and manage own records in real time.
 Incentives to share the information to gain advance warning on certain abnormalities in the vitals
 
 Future possible services and advances:
-Virtual docs where several specialists will monitor your health virtually
+Virtual doctors where several specialists will monitor your health remotely
 This way if a person develops certain disease he or she can join the specialize network of physicians who will
 monitor their conditions virtually, order tests, prescribe medicine, etc. If needed, the person is directed to visit a doc.
 That alone will drive health care cost tremendously.
@@ -75,8 +75,7 @@ Individual Medical Account and Providers, Doctors, Laboratories needs to be addr
 There is a need for secure communication among myriad of Providers, Doctors, Individuals, Laboratories etc. ,
 maintaining unique Ids and addresses of each participant, 
 garantiing secured delivery of each transaction and many more other aspects of modern exchanges.
-It is a process that will be evolving through times. But the ball needs to start rolling and your Company could start
-this process.
+It is a process that will be evolving through times. 
 
 
 
@@ -97,7 +96,7 @@ Usage of E1384 standards and E1633 coded values in the development of the EHR
 APPROACH:
 It will be a phased approach to this project. 
 
-Describe phase 1
+Phase 1
 
 Find SME in :
 1. medical records formats
@@ -125,15 +124,17 @@ Possible travel, office space for meetings
 Duration: 8 - 9 months after hiring os SMEs.
 
 
-Describe phase 2
+Phase 2
 
-Find SME in  cloud computing
+Find SME in cloud computing
 Find partners among 'banks' to develop a beta version ( perhaps offer an piece of the action)
 start designing Data definition layer
 . Login sequence for participants
 . Define the headers and trailers for any transmition
 . Study the  possible usage of the following:
 
+Today's standards:
+----------------------------
 ---- Digital Imaging and Communications in Medicine (DICOM) is a standard for handling, storing, printing, 
  and transmitting information in medical imaging. It includes a file format definition and a network 
  communications protocol. The communication protocol is an application protocol that uses TCP/IP to
@@ -161,7 +162,7 @@ the encoding, structure, and semantics of a patient summary clinical document fo
   It requires legal consulting
  
 
-Describe Phase 3
+Phase 3
 Beta rollout with small number of participants ( several docs, patients, hosp, labs, banks)
 
 
