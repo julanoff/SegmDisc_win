@@ -176,6 +176,8 @@ Data from CDC.gov
 # of visits to physician 928M
 data from American Clinical Lab Association
 7B clinical lab tests per year
+Data from KFF.org
+4B  presciptions in US per year
 
 
 Each visit is associated with multiple updates to the patient's HR.
@@ -184,6 +186,7 @@ Assumtions:
 1 doc visit - 2 updates , 4 requests - 12 transmissions
 1 hosp admission - 20 updates, 40 requests  - 120 transmissions
 1 lab - 1 update, 1 request - 4 transmittions
+1 pharmacy - 1 update, 1 request
 
 Assume .01% participation - translates to 40 - 50 M transmittions per year
 
