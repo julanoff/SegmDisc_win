@@ -15,7 +15,17 @@ It should allow secure and reliable access to the clients' information which res
 
               ADD DIAGRAM here
 
-How and why this project will succeed:
+About us:
+We have been in the banking funds transfer business for over 25 years. 
+Our vast experience includes protocol design and development, implementation large of MTS. ACH systems for the 
+large financial institutions like Bank of America, JP Morgan Chase, Bank of NY.
+We have a clear vision how to solve communication tasks, organize secure environment, network establishment etc.
+This knowledge and experience could provide new angle to this important task.
+
+
+
+
+How and why this approach will prevail:
 
 Market Forces that will govern the evolution of the whole process.
 The first step is to build rudimentary infrastructure.
