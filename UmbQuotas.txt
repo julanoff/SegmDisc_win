@@ -1,59 +1,50 @@
-
-To do:
-
-1. Picture how this looks today
-2. Picture for first rollout
-3. Picture of the phase3  rollout
-4. mention that MEDical News article
-
 OBJECTIVES:
 
-Create an infrastracture for ALL health care participants that enables secure, robust, reliable health info exchange.
-It should be independant from the internal record format of the participants.
-It should use common , standard communication protocols that will accomodate ALL necessary exchanges.
+Create an infrastructure for ALL health care participants that enables secure, robust, reliable health related 
+information exchange.
+It should be independent from the internal record format of the participants.
+It should use common , standard communication protocols that will accommodate ALL necessary exchanges.
 It should allow secure and reliable access to the clients' information which resides in the HRB (health rec bank).
 
               ADD DIAGRAM here
 
-About us:
-We have been in the banking funds transfer business for over 25 years. 
+Company Profile:
+Julan Management & Consulting have been in the banking funds transfer business for over 25 years. 
 Our vast experience includes protocol design and development, implementation large of MTS. ACH systems for the 
 large financial institutions like Bank of America, JP Morgan Chase, Bank of NY.
 We have a clear vision how to solve communication tasks, organize secure environment, network establishment etc.
+Managing the software development process from the initial design stage all the way to successful implementation is our
+strength. 
 This knowledge and experience could provide new angle to this important task.
+
 
 
 
 
 How and why this approach will prevail:
 
-Market Forces that will govern the evolution of the whole process.
-The first step is to build rudimentary infrastructure.
-Similarity with the banks money transfer networks (Bankwire, SWift, Telex, etc)
-People have not been forced to keep their money in the banks. The convenience and different benefits are forcing people to the banks.
+Market Forces will govern the evolution of the whole process in future.
+The first step is to build rudimentary infrastructure similar to the banks money transfer 
+networks (Bankwire, Swift, Telex, etc).
+People have not been forced to keep their money in the banks. The convenience and attractive benefits are 
+luring people to the banks.
 After they deposit their money in the bank the people demand certain services with it.
 In HR record keeping. 
-There will be several HRBs (Health Record Banks) where people will keep their records.
+There will be numerous HRBs (Health Record Banks) where people will keep their records.
 What will force them to do it?
-Ability to earn something by allowing anonimous access for researches, statistics, pharma scientists.
+Ability to earn something by allowing anonymous access for researches, statistics, pharmaceutical scientists.
 Convenience to access and manage own records in real time.
-Incentives to share the information to gain advance warning on certain abnormalities in the vitals
-
-Future possible services and advances:
-Virtual doctors where several specialists will monitor your health remotely
-This way if a person develops certain disease he or she can join the specialize network of physicians who will
-monitor their conditions virtually, order tests, prescribe medicine, etc. If needed, the person is directed to visit a doc.
-That alone will drive health care cost tremendously.
-+++
+Incentives to share the information to gain advance warning on certain abnormalities in the vitals.
 
 The competition between the HRBs will drive the innovation of the benefits, creating new apps, etc.
 It will lead to demand to HRP (health care provider) to participate in this activities.
-Before a person goes to a doc or lab he or she will demand participation in HRExchange.
+Before a person goes to a doc or lab he or she will demand participation in HR Exchange.
 There will be competition among HRBs and HRPs for a patient which will enhance this process.
 It will evolve with time. New services, benefits, applications will be created.
 IT people will compete in the new tremendous market of doctors, patients, hospitals, labs, etc.
 It is similar to large companies like FundTEch, ACI who create MTS application for large players.
 Variety of mobile apps creators to enable people's access to own information.
+
 
 Similarity with banking network evolvement.
 
@@ -71,6 +62,7 @@ It took a while until people embraced online banking. During this process people
 doing financial transaction over the net. That led to make people in charge of the management of their finances, 
 giving instructions to the banks who to pay and how. This part varies from bank to bank.
 
+
 The EHRS should be approached as such.
 Each individual needs an account with EHRS holding company (similar to banks).
 A person should be able to give instructions to the record holding company how to move his own records from one participating institution to another.
@@ -84,9 +76,17 @@ Some work is being done to establish Medical Accounts for Individuals. The means
 Individual Medical Account and Providers, Doctors, Laboratories needs to be addressed.
 There is a need for secure communication among myriad of Providers, Doctors, Individuals, Laboratories etc. ,
 maintaining unique Ids and addresses of each participant, 
-garantiing secured delivery of each transaction and many more other aspects of modern exchanges.
+guaranteeing secured delivery of each transaction and many more other aspects of modern exchanges.
 It is a process that will be evolving through times. 
 
+
+
+Future possible services and advances:
+Virtual doctors where several specialists will monitor your health remotely
+This way if a person develops certain disease he or she can join the specialize network of physicians who will
+monitor their conditions virtually, order tests, prescribe medicine, etc. If needed, the person is directed to visit a doc.
+That alone will drive health care cost down tremendously.
++++
 
 
 
@@ -98,8 +98,8 @@ Hospitals, large Labs ( similar to the corporate/financial institutions)
 
 Current development and standards
 
-According to the ASTM E1384 Standard Guide for Content and Structure of the Electronic Health Record1 the EHR serves all of the
-functions of the traditional health record with many advantages. 
+According to the ASTM E1384 Standard Guide for Content and Structure of the Electronic Health Record1 the EHR serves 
+all of the functions of the traditional health record with many advantages. 
 Usage of E1384 standards and E1633 coded values in the development of the EHR
 
 
@@ -111,27 +111,27 @@ Phase 1
 Find SME in :
 1. medical records formats
 2. EMR exchanges 
-3. EHR info keepers /Vault (like Microsoft Health Vault)
+3. EHR information keepers /Vault (like Microsoft Health Vault)
 
-Come up with a high level approach to the design
-That includes:
+Come up with a high level approach to the design which includes:
 1. what kind of request/reply 
-2. what needs to be transfered ( what kind of info, data)
-3. the format of this info
-4. seperate emr on basic blocks of info with permissions and rights
-5. determine how to divide the EMR by 
-`   a. relevance ( exa: urologist does not need info about alergies, or perhaps very high level note)
-    b. permission to access ( exa: foot doc does not need to see scan of the head)
+2. what needs to be transferred ( what kind of information, data)
+3. the format of this information
+4. separate emr on basic blocks of information with permissions and rights
+5. determine how to divide the EMR by:
+    a. relevance ( example: urologist does not need information about allergies, or perhaps very high level note)
+    b. permission to access ( example: foot doc does not need to see scan of the head)
+    c. which information is sharable with other participants vs. private doctors' notes
 6. map the accessibility diagram, who , why and how gets access to certain blocks.
 7. create a basic transportation format ( high level)
-8. define certain fields that are needed to transfer pertinant info
+8. define certain fields that are needed to transfer pertinent information
 
-Cost:
+Use of Funds:
 SMEs salaries for 1/2 year - ???
 My $
 Possible travel, office space for meetings
 
-Duration: 8 - 9 months after hiring os SMEs.
+Duration: 8 - 9 months after hiring of SMEs.
 
 
 Phase 2
@@ -140,7 +140,7 @@ Find SME in cloud computing
 Find partners among 'banks' to develop a beta version ( perhaps offer an piece of the action)
 start designing Data definition layer
 . Login sequence for participants
-. Define the headers and trailers for any transmition
+. Define the headers and trailers for any transmission
 . Study the  possible usage of the following:
 
 Today's standards:
@@ -162,10 +162,10 @@ CDA is an ANSI-certified standard from Health Level Seven International (HL7.org
 the encoding, structure, and semantics of a patient summary clinical document for exchange.
 
 
-. Determine what kind of requests are possible from the participants and what info should be sent.
+. Determine what kind of requests are possible from the participants and what information should be sent.
   this is THE MOST IMPORTANT piece. It will be evolving during the testing/poc process.
-. Requests/Replies - pairs for info exchange
-    . Get info request/Reply with info or Reject with an standard error like no priv or client not found, etc.
+. Requests/Replies - pairs for information exchange
+    . Get information request/Reply with information or Reject with an standard error like no priv or client not found, etc.
     . 
 
 . Start drafting participants' agreement.
@@ -173,7 +173,7 @@ the encoding, structure, and semantics of a patient summary clinical document fo
  
 
 Phase 3
-Beta rollout with small number of participants ( several docs, patients, hosp, labs, banks)
+Beta roll-out with small number of participants ( several docs, patients, hosp, labs, banks)
 
 
 Revenue projection.
@@ -187,22 +187,22 @@ Data from CDC.gov
 data from American Clinical Lab Association
 7B clinical lab tests per year
 Data from KFF.org
-4B  presciptions in US per year
+4B  prescriptions in US per year
 
 
 Each visit is associated with multiple updates to the patient's HR.
 
-Assumtions:
+Assumptions:
 1 doc visit - 2 updates , 4 requests - 12 transmissions
 1 hosp admission - 20 updates, 40 requests  - 120 transmissions
-1 lab - 1 update, 1 request - 4 transmittions
+1 lab - 1 update, 1 request - 4 transmissions
 1 pharmacy - 1 update, 1 request
 
-Assume .01% participation - translates to 40 - 50 M transmittions per year
+Assume .01% participation - translates to 40 - 50 M transmissions per year
 
 Pricing should be scalable which depends on the # of trans, sort of transaction (request, reply, update, etc.) and agreement with
 a participant.
-Initially assume : average price per transmittions $1 ( miniscule compare to the price of the services)
+Initially assume : average price per transmissions $1 ( minuscule compare to the price of the services)
 $40 - $50 M/per year.
 
 Potential
